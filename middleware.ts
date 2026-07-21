@@ -5,28 +5,40 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = ["/login", "/auth"];
 
 export async function middleware(request: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Without these the Supabase client constructor throws, which surfaces as an
+  // opaque MIDDLEWARE_INVOCATION_FAILED 500 on every route. Fail closed, but
+  // say why: we cannot verify a session, so nobody gets through to the reports.
+  if (!url || !key) {
+    return new NextResponse(
+      "Server misconfigured: NEXT_PUBLIC_SUPABASE_URL and " +
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY are missing. Set them in the hosting " +
+        "environment and redeploy — NEXT_PUBLIC_ values are baked in at build " +
+        "time, so a redeploy is required.",
+      { status: 500, headers: { "content-type": "text/plain" } },
+    );
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
-        },
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options),
+        );
       },
     },
-  );
+  });
 
   // Refreshes the auth token. Do not run any code between creating the client
   // and this call — a stale token here logs users out at random.
