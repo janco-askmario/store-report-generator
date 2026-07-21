@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Circle,
   Cloud,
+  CloudOff,
   Download,
   Eraser,
   Eye,
@@ -79,6 +80,7 @@ import {
 } from "@/components/ui";
 
 type Busy = "idle" | "preview" | "download";
+type SaveState = "idle" | "saving" | "saved" | "error";
 type BlockKind = "good" | "bad";
 
 /* Resize an uploaded image so logos stay small in localStorage / the PDF. */
@@ -304,29 +306,51 @@ export function ReportEditor({ id }: { id: string }) {
   const [data, setData] = useState<ReportData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "missing">("loading");
   const [busy, setBusy] = useState<Busy>("idle");
-  const [savedTick, setSavedTick] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const fileRef = useRef<HTMLInputElement>(null);
+  /* The load below sets `data`, which would otherwise trip a pointless
+     round-trip to Supabase the moment a report is opened. */
+  const skipNextSave = useRef(true);
 
   /* load */
   useEffect(() => {
-    const r = getReport(id);
-    if (r) {
-      setReport(r);
-      setData(r.data);
-      setStatus("ready");
-    } else {
-      setStatus("missing");
-    }
+    let cancelled = false;
+    setStatus("loading");
+    skipNextSave.current = true;
+
+    getReport(id).then((r) => {
+      if (cancelled) return;
+      if (r) {
+        setReport(r);
+        setData(r.data);
+        setStatus("ready");
+      } else {
+        setStatus("missing");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   /* autosave */
   useEffect(() => {
     if (status !== "ready" || !report || !data) return;
-    const t = setTimeout(() => {
-      saveReport({ ...report, data });
-      setSavedTick(true);
-      setTimeout(() => setSavedTick(false), 1200);
-    }, 300);
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
+      return;
+    }
+
+    // Longer debounce than the old localStorage write — this is a network call
+    // now, and typing a paragraph should not be one request per keystroke.
+    const t = setTimeout(async () => {
+      setSaveState("saving");
+      const ok = await saveReport({ ...report, data });
+      setSaveState(ok ? "saved" : "error");
+      if (ok) setTimeout(() => setSaveState("idle"), 1500);
+    }, 800);
+
     return () => clearTimeout(t);
   }, [data, report, status]);
 
@@ -480,7 +504,7 @@ export function ReportEditor({ id }: { id: string }) {
         <div>
           <p className="text-[15px] font-semibold text-ink">Report not found</p>
           <p className="mt-1 text-[13px] text-ink-soft">
-            It may have been deleted on this device.
+            It may have been deleted by someone on your team.
           </p>
           <button
             onClick={() => router.push("/")}
@@ -526,8 +550,24 @@ export function ReportEditor({ id }: { id: string }) {
                 </span>
               </div>
               <span className="flex items-center gap-2 text-[12px] text-ink-soft">
-                <span className="flex items-center gap-1">
-                  <Cloud size={12} /> {savedTick ? "Saved" : "Autosaves"}
+                <span
+                  className={cx(
+                    "flex items-center gap-1",
+                    saveState === "error" && "font-semibold text-danger",
+                  )}
+                >
+                  {saveState === "error" ? (
+                    <CloudOff size={12} />
+                  ) : (
+                    <Cloud size={12} />
+                  )}
+                  {saveState === "saving"
+                    ? "Saving…"
+                    : saveState === "saved"
+                      ? "Saved"
+                      : saveState === "error"
+                        ? "Not saved — retrying on next edit"
+                        : "Autosaves"}
                 </span>
                 <span className="text-black/20">·</span>
                 <span className="font-semibold text-brand-600">

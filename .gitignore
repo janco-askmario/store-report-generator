@@ -3,6 +3,12 @@ node_modules
 out
 build
 *.pdf
+*.tsbuildinfo
 .DS_Store
 npm-debug.log*
 .env*
+!.env.example
+
+# Supabase CLI local state (migrations under supabase/migrations stay tracked)
+supabase/.temp
+supabase/.branches

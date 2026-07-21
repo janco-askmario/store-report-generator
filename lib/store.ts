@@ -1,8 +1,8 @@
 import type { Block, ReportData, StoredReport } from "./types";
 import { createInitialData, uid } from "./defaults";
+import { createClient } from "./supabase/client";
 
-const KEY = "askmario-reports-v2";
-const OLD_KEY = "askmario-store-report-v1"; // single-draft from the first version
+const TABLE = "reports";
 
 /* --------------------------------------------------------- normalisation */
 
@@ -43,106 +43,174 @@ export function normalizeData(raw: Partial<ReportData> | undefined): ReportData 
   return d;
 }
 
-/* --------------------------------------------------------------- storage */
+/* --------------------------------------------------------------- mapping */
 
-function read(): StoredReport[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const list = JSON.parse(raw) as StoredReport[];
-      if (Array.isArray(list)) {
-        return list.map((r) => ({ ...r, data: normalizeData(r.data) }));
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return [];
+interface ReportRow {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  data: Partial<ReportData> | null;
 }
 
-function write(list: StoredReport[]): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(list));
-    return true;
-  } catch {
-    return false;
-  }
+/** Postgres timestamptz → epoch ms, which is what `StoredReport` carries. */
+function fromRow(row: ReportRow): StoredReport {
+  return {
+    id: row.id,
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+    data: normalizeData(row.data ?? undefined),
+  };
 }
 
-/** One-time migration of the original single autosaved draft into the library. */
-function migrateOldDraft(list: StoredReport[]): StoredReport[] {
-  if (typeof window === "undefined" || list.length > 0) return list;
-  try {
-    const raw = localStorage.getItem(OLD_KEY);
-    if (raw) {
-      const data = normalizeData(JSON.parse(raw));
-      const now = Date.now();
-      const migrated: StoredReport = { id: uid(), createdAt: now, updatedAt: now, data };
-      const next = [migrated];
-      write(next);
-      localStorage.removeItem(OLD_KEY);
-      return next;
-    }
-  } catch {
-    /* ignore */
-  }
-  return list;
+async function currentUserId(): Promise<string | null> {
+  const { data } = await createClient().auth.getUser();
+  return data.user?.id ?? null;
 }
 
 /* ------------------------------------------------------------------- API */
 
-export function listReports(): StoredReport[] {
-  const list = migrateOldDraft(read());
-  return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
+export async function listReports(): Promise<StoredReport[]> {
+  const { data, error } = await createClient()
+    .from(TABLE)
+    .select("id, created_at, updated_at, data")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("listReports failed:", error.message);
+    return [];
+  }
+  return (data as ReportRow[]).map(fromRow);
 }
 
-export function getReport(id: string): StoredReport | undefined {
-  return read().find((r) => r.id === id);
+export async function getReport(id: string): Promise<StoredReport | undefined> {
+  const { data, error } = await createClient()
+    .from(TABLE)
+    .select("id, created_at, updated_at, data")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getReport failed:", error.message);
+    return undefined;
+  }
+  return data ? fromRow(data as ReportRow) : undefined;
 }
 
-export function createReport(data?: ReportData): StoredReport {
-  const now = Date.now();
-  const report: StoredReport = {
-    id: uid(),
-    createdAt: now,
-    updatedAt: now,
-    data: data ? normalizeData(data) : createInitialData(),
-  };
-  write([report, ...read()]);
-  return report;
+export async function createReport(
+  data?: ReportData,
+): Promise<StoredReport | undefined> {
+  const { data: row, error } = await createClient()
+    .from(TABLE)
+    .insert({
+      data: data ? normalizeData(data) : createInitialData(),
+      created_by: await currentUserId(),
+    })
+    .select("id, created_at, updated_at, data")
+    .single();
+
+  if (error) {
+    console.error("createReport failed:", error.message);
+    return undefined;
+  }
+  return fromRow(row as ReportRow);
 }
 
-/** Insert or update a report; returns false if storage failed (e.g. quota). */
-export function saveReport(report: StoredReport): boolean {
-  const list = read();
-  const idx = list.findIndex((r) => r.id === report.id);
-  const next = { ...report, updatedAt: Date.now() };
-  if (idx >= 0) list[idx] = next;
-  else list.unshift(next);
-  return write(list);
+/** Update a report's body; returns false if the write failed. */
+export async function saveReport(report: StoredReport): Promise<boolean> {
+  const { error } = await createClient()
+    .from(TABLE)
+    .update({ data: report.data })
+    .eq("id", report.id);
+
+  if (error) {
+    console.error("saveReport failed:", error.message);
+    return false;
+  }
+  return true;
 }
 
-export function duplicateReport(id: string): StoredReport | undefined {
-  const source = getReport(id);
+export async function duplicateReport(
+  id: string,
+): Promise<StoredReport | undefined> {
+  const source = await getReport(id);
   if (!source) return undefined;
-  const now = Date.now();
-  const copy: StoredReport = {
-    id: uid(),
-    createdAt: now,
-    updatedAt: now,
-    data: {
-      ...structuredClone(source.data),
-      storeName: source.data.storeName
-        ? `${source.data.storeName} (copy)`
-        : "Untitled (copy)",
-    },
-  };
-  write([copy, ...read()]);
-  return copy;
+
+  return createReport({
+    ...structuredClone(source.data),
+    storeName: source.data.storeName
+      ? `${source.data.storeName} (copy)`
+      : "Untitled (copy)",
+  });
 }
 
-export function deleteReport(id: string): void {
-  write(read().filter((r) => r.id !== id));
+export async function deleteReport(id: string): Promise<void> {
+  const { error } = await createClient().from(TABLE).delete().eq("id", id);
+  if (error) console.error("deleteReport failed:", error.message);
+}
+
+/* ------------------------------------------------- legacy localStorage import */
+
+const LEGACY_KEY = "askmario-reports-v2";
+const LEGACY_KEY_V1 = "askmario-store-report-v1"; // single draft, first version
+
+/**
+ * Reports still sitting in this browser from before the Supabase move.
+ * Read-only — nothing writes to localStorage any more.
+ */
+export function readLegacyReports(): StoredReport[] {
+  if (typeof window === "undefined") return [];
+  const out: StoredReport[] = [];
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        for (const r of list as StoredReport[]) {
+          out.push({ ...r, data: normalizeData(r.data) });
+        }
+      }
+    }
+    if (out.length === 0) {
+      const old = localStorage.getItem(LEGACY_KEY_V1);
+      if (old) {
+        const now = Date.now();
+        out.push({
+          id: uid(),
+          createdAt: now,
+          updatedAt: now,
+          data: normalizeData(JSON.parse(old)),
+        });
+      }
+    }
+  } catch {
+    /* ignore malformed leftovers */
+  }
+  return out;
+}
+
+/** Upload leftover local reports to Supabase. Returns how many landed. */
+export async function importLegacyReports(): Promise<number> {
+  const legacy = readLegacyReports();
+  if (legacy.length === 0) return 0;
+
+  const userId = await currentUserId();
+  const { data, error } = await createClient()
+    .from(TABLE)
+    .insert(
+      legacy.map((r) => ({ data: r.data, created_by: userId })),
+    )
+    .select("id");
+
+  if (error) {
+    console.error("importLegacyReports failed:", error.message);
+    return 0;
+  }
+  return data?.length ?? 0;
+}
+
+/** Drop the local copies once they are safely in Supabase. */
+export function clearLegacyReports(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(LEGACY_KEY);
+  localStorage.removeItem(LEGACY_KEY_V1);
 }

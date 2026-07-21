@@ -4,20 +4,26 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Copy,
+  CloudUpload,
   FileText,
   FilePlus2,
   Loader2,
+  LogOut,
   Pencil,
   Store,
   Trash2,
 } from "lucide-react";
 import type { StoredReport } from "@/lib/types";
 import {
+  clearLegacyReports,
   createReport,
   deleteReport,
   duplicateReport,
+  importLegacyReports,
   listReports,
+  readLegacyReports,
 } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { computeHealth } from "@/lib/scoring";
 import { cx } from "@/components/ui";
 
@@ -32,25 +38,51 @@ function fmtDate(ts: number): string {
 export function ReportsLibrary() {
   const router = useRouter();
   const [reports, setReports] = useState<StoredReport[] | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [legacyCount, setLegacyCount] = useState(0);
+  const [importing, setImporting] = useState(false);
 
-  const refresh = () => setReports(listReports());
+  const refresh = async () => setReports(await listReports());
+
   useEffect(() => {
     refresh();
+    setLegacyCount(readLegacyReports().length);
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => setEmail(data.user?.email ?? null));
   }, []);
 
-  const onNew = () => {
-    const r = createReport();
-    router.push(`/report/${r.id}`);
+  const onNew = async () => {
+    const r = await createReport();
+    if (r) router.push(`/report/${r.id}`);
+    else alert("Could not create the report. Check your connection and retry.");
   };
-  const onDuplicate = (id: string) => {
-    duplicateReport(id);
-    refresh();
+  const onDuplicate = async (id: string) => {
+    await duplicateReport(id);
+    await refresh();
   };
-  const onDelete = (id: string, name: string) => {
+  const onDelete = async (id: string, name: string) => {
     if (confirm(`Delete "${name || "Untitled report"}"? This cannot be undone.`)) {
-      deleteReport(id);
-      refresh();
+      await deleteReport(id);
+      await refresh();
     }
+  };
+  const onImportLegacy = async () => {
+    setImporting(true);
+    const n = await importLegacyReports();
+    if (n > 0) {
+      clearLegacyReports();
+      setLegacyCount(0);
+      await refresh();
+    } else {
+      alert("Import failed — your local reports are untouched. Please retry.");
+    }
+    setImporting(false);
+  };
+  const onSignOut = async () => {
+    await createClient().auth.signOut();
+    router.push("/login");
+    router.refresh();
   };
 
   return (
@@ -76,16 +108,58 @@ export function ReportsLibrary() {
               </span>
             </div>
           </div>
-          <button
-            onClick={onNew}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2.5 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110"
-          >
-            <FilePlus2 size={16} /> New report
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onNew}
+              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2.5 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110"
+            >
+              <FilePlus2 size={16} /> New report
+            </button>
+            <button
+              onClick={onSignOut}
+              title={email ? `Sign out of ${email}` : "Sign out"}
+              aria-label="Sign out"
+              className="grid h-10 w-10 place-items-center rounded-xl text-ink-soft transition hover:bg-black/[0.04] hover:text-ink"
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        {legacyCount > 0 && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-brand-600">
+                <CloudUpload size={16} />
+              </div>
+              <div className="text-[13px] leading-snug text-ink">
+                <span className="font-semibold">
+                  {legacyCount} report{legacyCount > 1 ? "s" : ""} saved in this browser
+                </span>
+                <span className="block text-ink-soft">
+                  From before reports synced to the cloud. Upload to keep
+                  {legacyCount > 1 ? " them" : " it"} on your account.
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={onImportLegacy}
+              disabled={importing}
+              className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+            >
+              {importing ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" /> Uploading…
+                </>
+              ) : (
+                "Upload to cloud"
+              )}
+            </button>
+          </div>
+        )}
+
         {reports === null ? (
           <div className="grid place-items-center py-24">
             <Loader2 className="animate-spin text-ink-soft" size={22} />
