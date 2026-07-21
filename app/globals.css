@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme {
+  /* AskMario brand */
+  --color-brand: #7948bf;
+  --color-brand-50: #f4eefb;
+  --color-brand-100: #e7d9f6;
+  --color-brand-200: #d0b4ee;
+  --color-brand-300: #b389e2;
+  --color-brand-400: #9865d4;
+  --color-brand-500: #7948bf;
+  --color-brand-600: #6838a6;
+  --color-brand-700: #542c85;
+  --color-brand-800: #422369;
+  --color-brand-900: #331a52;
+
+  --color-leaf: #94c147;
+  --color-leaf-50: #f4f9ea;
+  --color-leaf-100: #e7f2d1;
+  --color-leaf-200: #d0e5a6;
+  --color-leaf-300: #b6d675;
+  --color-leaf-400: #a3cc5a;
+  --color-leaf-500: #94c147;
+  --color-leaf-600: #74992f;
+  --color-leaf-700: #587426;
+  --color-leaf-800: #465c22;
+  --color-leaf-900: #3a4d20;
+
+  --color-danger: #e5484d;
+  --color-warn: #f5a524;
+
+  --color-ink: #1b1725;
+  --color-ink-soft: #4b4459;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: #f6f4fb;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle brand gradient backdrop for the app shell */
+.app-bg {
+  background:
+    radial-gradient(1200px 600px at 100% -10%, rgba(121, 72, 191, 0.10), transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, rgba(148, 193, 71, 0.10), transparent 55%),
+    #f6f4fb;
+}
+
+/* Custom scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cfc6e3 transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cfc6e3;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #b3a6d6;
+  background-clip: content-box;
+}
+
+/* Hide number input spinners for a cleaner look */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-pop {
+  animation: pop-in 0.18s ease-out;
+}
