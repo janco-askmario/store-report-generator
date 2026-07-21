@@ -11,7 +11,8 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
-  const [error, setError] = useState<string | null>(null);
+  // An expired or reused link bounces back here with ?error=…
+  const [error, setError] = useState<string | null>(searchParams.get("error"));
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +28,14 @@ function LoginForm() {
     });
 
     if (error) {
-      setError(error.message);
+      // Sign-ups are disabled by design, so an unknown address lands here.
+      // Supabase's own wording ("Signups not allowed for otp") reads like a
+      // fault rather than the access decision it actually is.
+      setError(
+        /signups? not allowed/i.test(error.message)
+          ? "That email isn't on the team yet. Ask an admin to invite you in Supabase."
+          : error.message,
+      );
       setStatus("idle");
     } else {
       setStatus("sent");
