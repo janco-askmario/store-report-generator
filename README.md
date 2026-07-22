@@ -32,8 +32,17 @@ across browsers and devices instead of living in one browser's `localStorage`.
    The database password is **not** used here — that's only for direct Postgres
    connections. Never expose the `service_role` key to the browser.
 
-2. **Schema** — run `supabase/migrations/20260721000000_reports.sql` via the
-   dashboard SQL Editor, or `supabase db push` with the CLI linked.
+2. **Schema** — run the migrations in `supabase/migrations/` **in filename
+   order** via the dashboard SQL Editor, or `supabase db push` with the CLI
+   linked:
+
+   - `20260721000000_reports.sql` — the `reports` table, RLS and `updated_at`.
+   - `20260722000000_realtime_collab.sql` — realtime collaboration: the
+     `report_updates` log, channel authorization and the compaction function.
+
+   The second one must be applied **before** deploying the code that uses it.
+   Without `report_updates` the editor cannot open any report at all — it does
+   not fall back to single-user editing.
 
 3. **Lock down sign-ups** — Authentication → **Sign In / Providers** → turn off
    *Allow new users to sign up*, then invite teammates under Authentication →
