@@ -70,7 +70,9 @@ import {
 import { useCollabReport } from "@/lib/collab/useCollabReport";
 import { blockText, findBlock, page3Text, proseText } from "@/lib/collab/doc";
 import { usePresence } from "@/lib/presence";
+import { type BlockTemplates, useBlockTemplates } from "@/lib/useBlockTemplates";
 import { BlockEditor } from "@/components/BlockEditor";
+import { BlockTemplatePicker } from "@/components/BlockTemplatePicker";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
 import { CollabTextArea, CollabTextAreaField } from "@/components/CollabField";
 import {
@@ -124,6 +126,7 @@ function SortableBlock({
   paragraphText,
   onUpdate,
   onRemove,
+  onSaveTemplate,
 }: {
   block: Block;
   kind: BlockKind;
@@ -132,6 +135,7 @@ function SortableBlock({
   paragraphText: Y.Text;
   onUpdate: (p: Partial<Block>) => void;
   onRemove: () => void;
+  onSaveTemplate: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.id });
@@ -151,6 +155,7 @@ function SortableBlock({
         paragraphText={paragraphText}
         onChange={onUpdate}
         onRemove={onRemove}
+        onSaveTemplate={onSaveTemplate}
         isDragging={isDragging}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
@@ -167,10 +172,12 @@ function BlockSection({
   blocks,
   max,
   doc,
+  templates,
   onAdd,
   onUpdate,
   onRemove,
   onReorder,
+  onSaveTemplate,
   customLabel,
   customText,
   customPlaceholder,
@@ -182,10 +189,12 @@ function BlockSection({
   blocks: Block[];
   max: number;
   doc: Y.Doc;
-  onAdd: () => void;
+  templates: BlockTemplates;
+  onAdd: (preset?: Partial<Block>) => void;
   onUpdate: (id: string, p: Partial<Block>) => void;
   onRemove: (id: string) => void;
   onReorder: (from: number, to: number) => void;
+  onSaveTemplate: (block: Block) => void;
   customLabel?: string;
   customText?: Y.Text;
   customPlaceholder?: string;
@@ -247,6 +256,7 @@ function BlockSection({
                     paragraphText={blockText(map, "paragraph")}
                     onUpdate={(p) => onUpdate(b.id, p)}
                     onRemove={() => onRemove(b.id)}
+                    onSaveTemplate={() => onSaveTemplate(b)}
                   />
                 );
               })}
@@ -254,21 +264,44 @@ function BlockSection({
           </SortableContext>
         </DndContext>
 
-        <button
-          onClick={onAdd}
-          disabled={full}
-          className={cx(
-            "flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-3.5 text-[14px] font-semibold transition",
-            full
-              ? "cursor-not-allowed border-black/10 text-ink-soft/50"
-              : kind === "good"
-                ? "border-leaf-300 text-leaf-700 hover:bg-leaf-50"
-                : "border-red-200 text-danger hover:bg-red-50",
-          )}
-        >
-          <Plus size={17} />
-          {full ? `Maximum ${max} blocks` : `Add ${title} block`}
-        </button>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            onClick={() => onAdd()}
+            disabled={full}
+            className={cx(
+              "flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-3.5 text-[14px] font-semibold transition",
+              full
+                ? "cursor-not-allowed border-black/10 text-ink-soft/50"
+                : kind === "good"
+                  ? "border-leaf-300 text-leaf-700 hover:bg-leaf-50"
+                  : "border-red-200 text-danger hover:bg-red-50",
+            )}
+          >
+            <Plus size={17} />
+            {full ? `Maximum ${max} blocks` : `Add blank block`}
+          </button>
+
+          <BlockTemplatePicker
+            kind={kind}
+            templates={templates.all}
+            loading={templates.loading}
+            disabled={full}
+            onOpen={() => void templates.refresh()}
+            onInsert={(t) =>
+              onAdd({ title: t.title, paragraph: t.paragraph, icon: t.icon })
+            }
+            onDelete={(t) => {
+              if (confirm(`Delete the template "${t.title}" for everyone?`)) {
+                void templates.remove(t.id);
+              }
+            }}
+          />
+        </div>
+        {full && (
+          <p className="text-center text-[12px] text-ink-soft">
+            Maximum {max} blocks reached.
+          </p>
+        )}
 
         {customText && (
           <div className="pt-1">
@@ -347,6 +380,27 @@ export function ReportEditor({ id }: { id: string }) {
   const { byReport, me } = usePresence(id);
   // Everyone in this report except this browser.
   const others = (byReport.get(id) ?? []).filter((u) => u.email !== me);
+
+  const templates = useBlockTemplates();
+
+  /* Save a block's current wording as a reusable template for the whole team. */
+  const onSaveTemplate = async (kind: BlockKind, block: Block) => {
+    if (!block.title.trim() && !block.paragraph.trim()) {
+      alert("Add a title or some text to this block before saving it.");
+      return;
+    }
+    const ok = await templates.save({
+      kind,
+      title: block.title,
+      paragraph: block.paragraph,
+      icon: block.icon,
+    });
+    alert(
+      ok
+        ? `Saved "${block.title || "Untitled"}" — it is now in the ${kind === "good" ? "Good" : "Bad"} template list for everyone.`
+        : "Could not save the template. Check your connection and retry.",
+    );
+  };
 
   /* logo */
   const onPickLogo = async (file: File | null) => {
@@ -950,10 +1004,12 @@ export function ReportEditor({ id }: { id: string }) {
             blocks={data.goodBlocks}
             max={maxBlocks("good")}
             doc={doc}
-            onAdd={() => addBlock("good")}
+            templates={templates}
+            onAdd={(preset) => addBlock("good", preset)}
             onUpdate={(bid, p) => updateBlock("good", bid, p)}
             onRemove={(bid) => removeBlock("good", bid)}
             onReorder={(from, to) => reorderBlock("good", from, to)}
+            onSaveTemplate={(b) => void onSaveTemplate("good", b)}
             customLabel="Custom paragraph — “Success is Multi-Faceted” (Page 1)"
             customText={proseText(doc, "goodCustom")}
             customPlaceholder="A short closing note celebrating what's working across the store…"
@@ -968,10 +1024,12 @@ export function ReportEditor({ id }: { id: string }) {
             blocks={data.badBlocks}
             max={maxBlocks("bad")}
             doc={doc}
-            onAdd={() => addBlock("bad")}
+            templates={templates}
+            onAdd={(preset) => addBlock("bad", preset)}
             onUpdate={(bid, p) => updateBlock("bad", bid, p)}
             onRemove={(bid) => removeBlock("bad", bid)}
             onReorder={(from, to) => reorderBlock("bad", from, to)}
+            onSaveTemplate={(b) => void onSaveTemplate("bad", b)}
           />
 
           {/* Narrative */}

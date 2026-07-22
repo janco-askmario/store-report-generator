@@ -39,10 +39,15 @@ across browsers and devices instead of living in one browser's `localStorage`.
    - `20260721000000_reports.sql` — the `reports` table, RLS and `updated_at`.
    - `20260722000000_realtime_collab.sql` — realtime collaboration: the
      `report_updates` log, channel authorization and the compaction function.
+   - `20260722100000_block_templates.sql` — the `block_templates` table backing
+     the team's saved Good/Bad blocks.
 
-   The second one must be applied **before** deploying the code that uses it.
-   Without `report_updates` the editor cannot open any report at all — it does
-   not fall back to single-user editing.
+   The collab migration must be applied **before** deploying the code that uses
+   it. Without `report_updates` the editor cannot open any report at all — it
+   does not fall back to single-user editing.
+
+   The block-templates migration is less severe: without it the built-in
+   templates still work and only saving your own fails.
 
 3. **Lock down sign-ups** — Authentication → **Sign In / Providers** → turn off
    *Allow new users to sign up*, then invite teammates under Authentication →

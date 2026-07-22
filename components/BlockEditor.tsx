@@ -1,7 +1,7 @@
 "use client";
 
 import type { HTMLAttributes } from "react";
-import { Check, GripVertical, Trash2 } from "lucide-react";
+import { BookmarkPlus, Check, GripVertical, Trash2 } from "lucide-react";
 import type * as Y from "yjs";
 import type { Block } from "@/lib/types";
 import { CollabInput, CollabTextArea } from "./CollabField";
@@ -42,6 +42,7 @@ export function BlockEditor({
   paragraphText,
   onChange,
   onRemove,
+  onSaveTemplate,
   dragHandleProps,
   isDragging,
 }: {
@@ -55,6 +56,7 @@ export function BlockEditor({
   paragraphText: Y.Text;
   onChange: (patch: Partial<Block>) => void;
   onRemove: () => void;
+  onSaveTemplate?: () => void;
   dragHandleProps?: HTMLAttributes<HTMLButtonElement>;
   isDragging?: boolean;
 }) {
@@ -111,15 +113,28 @@ export function BlockEditor({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={onRemove}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft transition hover:bg-red-50 hover:text-danger"
-          title="Remove block"
-          aria-label="Remove block"
-        >
-          <Trash2 size={16} />
-        </button>
+        <div className="flex shrink-0 flex-col gap-1">
+          {onSaveTemplate && (
+            <button
+              type="button"
+              onClick={onSaveTemplate}
+              className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft transition hover:bg-brand-50 hover:text-brand-600"
+              title="Save as a reusable template"
+              aria-label="Save block as template"
+            >
+              <BookmarkPlus size={16} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRemove}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft transition hover:bg-red-50 hover:text-danger"
+            title="Remove block"
+            aria-label="Remove block"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Highlight checkbox */}

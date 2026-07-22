@@ -46,7 +46,8 @@ export interface CollabReport {
   patchReferrers: (p: Partial<ReportData["referrers"]>) => void;
   patchPage3: (p: Partial<ReportData["page3"]>) => void;
 
-  addBlock: (kind: BlockKind) => void;
+  /** `preset` prefills the new block — used when inserting a template. */
+  addBlock: (kind: BlockKind, preset?: Partial<Block>) => void;
   updateBlock: (kind: BlockKind, id: string, p: Partial<Block>) => void;
   removeBlock: (kind: BlockKind, id: string) => void;
   reorderBlock: (kind: BlockKind, from: number, to: number) => void;
@@ -179,13 +180,16 @@ export function useCollabReport(id: string): CollabReport {
   );
 
   const addBlock = useCallback(
-    (kind: BlockKind) => {
+    (kind: BlockKind, preset?: Partial<Block>) => {
       if (!doc) return;
       const arr = blocksArray(doc, kind);
       if (arr.length >= maxBlocks(kind)) return;
       const block = createBlock({
         icon: kind === "good" ? "star" : "alert-triangle",
+        ...preset,
       });
+      // Goes through createBlockMap like any other block, so the template's text
+      // lands in Y.Text and is immediately co-editable.
       arr.push([createBlockMap(block, nextOrder(arr))]);
     },
     [doc],
