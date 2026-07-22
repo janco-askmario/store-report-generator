@@ -12,6 +12,18 @@ function renderEl(el: IconElement, i: number) {
       return <polyline key={i} points={el.points} />;
     case "polygon":
       return <polygon key={i} points={el.points} />;
+    case "rect":
+      return (
+        <rect
+          key={i}
+          x={el.x}
+          y={el.y}
+          width={el.width}
+          height={el.height}
+          rx={el.rx}
+          ry={el.rx}
+        />
+      );
   }
 }
 

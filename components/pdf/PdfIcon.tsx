@@ -5,6 +5,7 @@ import {
   Line,
   Polyline,
   Polygon,
+  Rect,
 } from "@react-pdf/renderer";
 import { getIcon, type IconElement } from "@/lib/icons";
 
@@ -35,6 +36,18 @@ function El({
       return <Polyline points={el.points} {...common} />;
     case "polygon":
       return <Polygon points={el.points} {...common} />;
+    case "rect":
+      return (
+        <Rect
+          x={el.x}
+          y={el.y}
+          width={el.width}
+          height={el.height}
+          rx={el.rx}
+          ry={el.rx}
+          {...common}
+        />
+      );
   }
 }
 
