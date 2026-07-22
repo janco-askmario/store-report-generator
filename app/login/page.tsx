@@ -4,18 +4,24 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, FileText, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { cx } from "@/components/ui";
+
+type Mode = "signin" | "signup";
 
 /** Supabase's raw auth errors leak implementation detail — say it plainly. */
-function friendlyError(message: string): string {
-  // Reached when sign-in failed *and* the follow-up sign-up was rejected
-  // because the account exists — so the password was simply wrong.
+function friendlyError(message: string, mode: Mode): string {
+  if (/invalid login credentials/i.test(message)) {
+    return mode === "signin"
+      ? "No account matches that email and password. If you're new, create an account first."
+      : "Those details were rejected.";
+  }
   if (/already registered|already exists/i.test(message)) {
-    return "Wrong password for this account.";
+    return "An account with this email already exists — switch to Sign in.";
   }
   if (/signups? not allowed|signup is disabled/i.test(message)) {
-    return "New accounts are disabled. Enable sign-ups in Supabase → Authentication → Sign In / Providers.";
+    return "New accounts are disabled in Supabase → Authentication → Sign In / Providers.";
   }
-  if (/password.*(6|at least)/i.test(message)) {
+  if (/password/i.test(message) && /6|at least|short/i.test(message)) {
     return "Password must be at least 6 characters.";
   }
   if (/rate limit|too many/i.test(message)) {
@@ -29,55 +35,78 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
 
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(
-    searchParams.get("error"),
-  );
+  const [error, setError] = useState<string | null>(searchParams.get("error"));
+
+  const switchMode = (m: Mode) => {
+    setMode(m);
+    setError(null);
+    setConfirm("");
+  };
+
+  const goToApp = () => {
+    // Only ever follow an in-app path, so ?next= can't bounce us off-site.
+    router.push(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+    router.refresh(); // let the middleware see the new session cookie
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
 
+    if (mode === "signup") {
+      if (password !== confirm) {
+        setError("The two passwords don't match.");
+        return;
+      }
+      if (password.length < 6) {
+        setError("Password must be at least 6 characters.");
+        return;
+      }
+    }
+
+    setSubmitting(true);
     const supabase = createClient();
 
-    // Sign in first; if no such account exists yet, create it on the spot.
-    // Keeps email out of the loop entirely — Supabase's built-in sender only
-    // allows a couple of messages an hour, which magic links burn instantly.
-    const signIn = await supabase.auth.signInWithPassword({ email, password });
-
-    if (signIn.error) {
-      if (!/invalid login credentials/i.test(signIn.error.message)) {
-        setError(friendlyError(signIn.error.message));
+    if (mode === "signin") {
+      // Strictly a sign-in: an unknown email is an error, never a new account.
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) {
+        setError(friendlyError(error.message, "signin"));
         setSubmitting(false);
         return;
       }
-
-      const signUp = await supabase.auth.signUp({ email, password });
-      if (signUp.error) {
-        setError(friendlyError(signUp.error.message));
+    } else {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(friendlyError(error.message, "signup"));
         setSubmitting(false);
         return;
       }
       // No session means Supabase is still set to confirm addresses by email,
       // which defeats the point — the account exists but cannot be used yet.
-      if (!signUp.data.session) {
+      if (!data.session) {
         setError(
-          "Account created, but email confirmation is still switched on. " +
-            "Turn off “Confirm email” in Supabase → Authentication → Sign In / Providers.",
+          "Account created, but email confirmation is switched on. Turn off " +
+            "“Confirm email” in Supabase → Authentication → Sign In / Providers.",
         );
         setSubmitting(false);
         return;
       }
     }
 
-    // Only ever follow an in-app path, so ?next= can't bounce us off-site.
-    router.push(next.startsWith("/") && !next.startsWith("//") ? next : "/");
-    router.refresh(); // let the middleware see the new session cookie
+    goToApp();
   };
+
+  const isSignup = mode === "signup";
 
   return (
     <>
@@ -89,8 +118,40 @@ function LoginForm() {
           Store Reports
         </h1>
         <p className="mt-1 text-[13px] text-ink-soft">
-          Sign in to open the AskMario report library.
+          {isSignup
+            ? "Create an account to join the AskMario report library."
+            : "Sign in to open the AskMario report library."}
         </p>
+      </div>
+
+      {/* Mode switch */}
+      <div
+        role="tablist"
+        aria-label="Sign in or create account"
+        className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-black/[0.04] p-1"
+      >
+        {(
+          [
+            ["signin", "Sign in"],
+            ["signup", "Create account"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            role="tab"
+            type="button"
+            aria-selected={mode === value}
+            onClick={() => switchMode(value)}
+            className={cx(
+              "rounded-lg px-3 py-2 text-[13px] font-semibold transition",
+              mode === value
+                ? "bg-white text-brand-700 shadow-sm"
+                : "text-ink-soft hover:text-ink",
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
@@ -126,7 +187,7 @@ function LoginForm() {
               id="password"
               type={showPassword ? "text" : "password"}
               required
-              autoComplete="current-password"
+              autoComplete={isSignup ? "new-password" : "current-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 pr-11 text-[14px] text-ink outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10"
@@ -140,7 +201,33 @@ function LoginForm() {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+          {isSignup && (
+            <p className="mt-1.5 text-[11px] text-ink-soft">
+              At least 6 characters.
+            </p>
+          )}
         </div>
+
+        {/* Typos are unrecoverable without email resets, so confirm on signup. */}
+        {isSignup && (
+          <div>
+            <label
+              htmlFor="confirm"
+              className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-ink-soft"
+            >
+              Confirm password
+            </label>
+            <input
+              id="confirm"
+              type={showPassword ? "text" : "password"}
+              required
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] text-ink outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10"
+            />
+          </div>
+        )}
 
         {error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-[12px] text-danger">
@@ -155,8 +242,11 @@ function LoginForm() {
         >
           {submitting ? (
             <>
-              <Loader2 size={16} className="animate-spin" /> Signing in…
+              <Loader2 size={16} className="animate-spin" />
+              {isSignup ? "Creating account…" : "Signing in…"}
             </>
+          ) : isSignup ? (
+            "Create account"
           ) : (
             "Sign in"
           )}
@@ -164,8 +254,29 @@ function LoginForm() {
       </form>
 
       <p className="mt-5 text-center text-[12px] text-ink-soft">
-        First time? Enter your email and pick a password — your account is
-        created automatically.
+        {isSignup ? (
+          <>
+            Already have an account?{" "}
+            <button
+              type="button"
+              onClick={() => switchMode("signin")}
+              className="font-semibold text-brand-700 underline-offset-2 hover:underline"
+            >
+              Sign in
+            </button>
+          </>
+        ) : (
+          <>
+            First time here?{" "}
+            <button
+              type="button"
+              onClick={() => switchMode("signup")}
+              className="font-semibold text-brand-700 underline-offset-2 hover:underline"
+            >
+              Create an account
+            </button>
+          </>
+        )}
       </p>
     </>
   );
