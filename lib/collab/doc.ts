@@ -127,6 +127,23 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+/**
+ * Read a fixed set of string keys off a map.
+ *
+ * Returns `Record<K, string>` rather than `Object.fromEntries`'s
+ * `{ [k: string]: string }`, so the result satisfies `Analytics`, `Page3Notes`
+ * and friends on its own merits instead of via a cast that would stop checking
+ * the day someone adds a field to one of them.
+ */
+function readKeys<K extends string>(
+  map: Y.Map<unknown> | undefined,
+  keys: readonly K[],
+): Record<K, string> {
+  const out = {} as Record<K, string>;
+  for (const key of keys) out[key] = str(map?.get(key));
+  return out;
+}
+
 /* ---------------------------------------------------------- named accessors */
 
 export function listKey(kind: BlockKind): "goodBlocks" | "badBlocks" {
@@ -399,15 +416,11 @@ export function docToReportData(doc: Y.Doc): ReportData {
     reportDate: str(root.get("reportDate")),
     currency: str(root.get("currency")),
 
-    analytics: Object.fromEntries(
-      ANALYTICS_KEYS.map((k) => [k, str(analytics?.get(k))]),
-    ) as ReportData["analytics"],
+    analytics: readKeys(analytics, ANALYTICS_KEYS),
 
     socials: {
       enabled: Boolean(socials?.get("enabled")),
-      ...(Object.fromEntries(
-        LINK_KEYS.map((k) => [k, str(socials?.get(k))]),
-      ) as Record<(typeof LINK_KEYS)[number], string>),
+      ...readKeys(socials, LINK_KEYS),
       // No ordering field here: custom socials are only ever appended and
       // removed, never dragged, so array order is the display order.
       custom: (peekArray(socials, "custom")?.toArray() ?? []).map((m) => ({
@@ -419,9 +432,7 @@ export function docToReportData(doc: Y.Doc): ReportData {
 
     referrers: {
       enabled: Boolean(referrers?.get("enabled")),
-      ...(Object.fromEntries(
-        LINK_KEYS.map((k) => [k, str(referrers?.get(k))]),
-      ) as Record<(typeof LINK_KEYS)[number], string>),
+      ...readKeys(referrers, LINK_KEYS),
     },
 
     goodBlocks: readBlocks(peekArray(root, "goodBlocks")),
@@ -430,9 +441,7 @@ export function docToReportData(doc: Y.Doc): ReportData {
     goodCustom: str(root.get("goodCustom")),
     foodForThought: str(root.get("foodForThought")),
     actionPlan: str(root.get("actionPlan")),
-    page3: Object.fromEntries(
-      PAGE3.map((k) => [k, str(page3?.get(k))]),
-    ) as Page3Notes,
+    page3: readKeys(page3, PAGE3),
   });
 }
 
