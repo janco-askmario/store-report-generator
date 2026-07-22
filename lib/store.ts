@@ -116,17 +116,21 @@ export async function createReport(
 }
 
 /** Update a report's body; returns false if the write failed. */
-export async function saveReport(report: StoredReport): Promise<boolean> {
-  const { error } = await createClient()
-    .from(TABLE)
-    .update({ data: report.data })
-    .eq("id", report.id);
+export async function saveReportData(
+  id: string,
+  data: ReportData,
+): Promise<boolean> {
+  const { error } = await createClient().from(TABLE).update({ data }).eq("id", id);
 
   if (error) {
     console.error("saveReport failed:", error.message);
     return false;
   }
   return true;
+}
+
+export async function saveReport(report: StoredReport): Promise<boolean> {
+  return saveReportData(report.id, report.data);
 }
 
 export async function duplicateReport(

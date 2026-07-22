@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Copy,
@@ -25,6 +25,8 @@ import {
 } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { computeHealth } from "@/lib/scoring";
+import { type PresentUser, usePresence } from "@/lib/presence";
+import { PresenceAvatars } from "@/components/PresenceAvatars";
 import { cx } from "@/components/ui";
 
 function fmtDate(ts: number): string {
@@ -42,7 +44,13 @@ export function ReportsLibrary() {
   const [legacyCount, setLegacyCount] = useState(0);
   const [importing, setImporting] = useState(false);
 
+  const { byReport } = usePresence(null);
+
   const refresh = async () => setReports(await listReports());
+  // The realtime effect below must not re-subscribe every render just to reach
+  // the latest closure.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
 
   useEffect(() => {
     refresh();
@@ -50,6 +58,40 @@ export function ReportsLibrary() {
     createClient()
       .auth.getUser()
       .then(({ data }) => setEmail(data.user?.email ?? null));
+  }, []);
+
+  /*
+   * Keep the library live.
+   *
+   * Events are treated purely as "something changed, go and look" rather than
+   * as data. A report's `data` blob carries a base64 logo, so an UPDATE payload
+   * can exceed Realtime's ~1MB record limit and arrive truncated — refetching
+   * sidesteps that entirely, and also means there is only one code path that
+   * turns a row into a `StoredReport`.
+   *
+   * Debounced because a colleague typing produces a snapshot write every couple
+   * of seconds, and each one would otherwise be its own round trip.
+   */
+  useEffect(() => {
+    const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const channel = supabase
+      .channel("reports-library")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reports" },
+        () => {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => void refreshRef.current(), 600);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const onNew = async () => {
@@ -178,6 +220,7 @@ export function ReportsLibrary() {
                 <ReportCard
                   key={r.id}
                   report={r}
+                  viewers={byReport.get(r.id) ?? []}
                   onOpen={() => router.push(`/report/${r.id}`)}
                   onDuplicate={() => onDuplicate(r.id)}
                   onDelete={() => onDelete(r.id, r.data.storeName)}
@@ -200,11 +243,13 @@ export function ReportsLibrary() {
 
 function ReportCard({
   report,
+  viewers,
   onOpen,
   onDuplicate,
   onDelete,
 }: {
   report: StoredReport;
+  viewers: PresentUser[];
   onOpen: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -255,6 +300,15 @@ function ReportCard({
           <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-danger">
             {data.badBlocks.length} to fix
           </span>
+          {viewers.length > 0 && (
+            <span
+              className="ml-auto flex items-center gap-1.5 pl-1"
+              title={`In this report now:\n${viewers.map((v) => v.email).join("\n")}`}
+            >
+              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-leaf-500" />
+              <PresenceAvatars users={viewers} size={20} max={3} />
+            </span>
+          )}
         </div>
       </button>
 

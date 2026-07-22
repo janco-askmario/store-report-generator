@@ -13,7 +13,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  arrayMove,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
@@ -43,10 +42,12 @@ import {
   ThumbsUp,
   Trash2,
   Upload,
+  Users,
   X,
 } from "lucide-react";
+import type * as Y from "yjs";
 
-import type { Block, ReportData, StoredReport } from "@/lib/types";
+import type { Block, ReportData } from "@/lib/types";
 import { createBlock, createInitialData, maxBlocks, uid } from "@/lib/defaults";
 import { computeCompletion } from "@/lib/completion";
 import {
@@ -66,21 +67,23 @@ import {
   fulfillmentVerdict,
   type Verdict,
 } from "@/lib/benchmarks";
-import { getReport, saveReport } from "@/lib/store";
+import { useCollabReport } from "@/lib/collab/useCollabReport";
+import { blockText, findBlock, page3Text, proseText } from "@/lib/collab/doc";
+import { usePresence } from "@/lib/presence";
 import { BlockEditor } from "@/components/BlockEditor";
+import { PresenceAvatars } from "@/components/PresenceAvatars";
+import { CollabTextArea, CollabTextAreaField } from "@/components/CollabField";
 import {
   Field,
   Label,
   MetricPill,
   ScoreRing,
   SectionCard,
-  TextArea,
   Toggle,
   cx,
 } from "@/components/ui";
 
 type Busy = "idle" | "preview" | "download";
-type SaveState = "idle" | "saving" | "saved" | "error";
 type BlockKind = "good" | "bad";
 
 /* Resize an uploaded image so logos stay small in localStorage / the PDF. */
@@ -117,12 +120,16 @@ function SortableBlock({
   block,
   kind,
   index,
+  titleText,
+  paragraphText,
   onUpdate,
   onRemove,
 }: {
   block: Block;
   kind: BlockKind;
   index: number;
+  titleText: Y.Text;
+  paragraphText: Y.Text;
   onUpdate: (p: Partial<Block>) => void;
   onRemove: () => void;
 }) {
@@ -140,6 +147,8 @@ function SortableBlock({
         block={block}
         kind={kind}
         index={index}
+        titleText={titleText}
+        paragraphText={paragraphText}
         onChange={onUpdate}
         onRemove={onRemove}
         isDragging={isDragging}
@@ -157,13 +166,13 @@ function BlockSection({
   icon,
   blocks,
   max,
+  doc,
   onAdd,
   onUpdate,
   onRemove,
   onReorder,
   customLabel,
-  customValue,
-  onCustom,
+  customText,
   customPlaceholder,
 }: {
   kind: BlockKind;
@@ -172,13 +181,13 @@ function BlockSection({
   icon: React.ReactNode;
   blocks: Block[];
   max: number;
+  doc: Y.Doc;
   onAdd: () => void;
   onUpdate: (id: string, p: Partial<Block>) => void;
   onRemove: (id: string) => void;
   onReorder: (from: number, to: number) => void;
   customLabel?: string;
-  customValue?: string;
-  onCustom?: (v: string) => void;
+  customText?: Y.Text;
   customPlaceholder?: string;
 }) {
   const full = blocks.length >= max;
@@ -225,16 +234,22 @@ function BlockSection({
         >
           <SortableContext items={ids} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
-              {blocks.map((b, i) => (
-                <SortableBlock
-                  key={b.id}
-                  block={b}
-                  kind={kind}
-                  index={i}
-                  onUpdate={(p) => onUpdate(b.id, p)}
-                  onRemove={() => onRemove(b.id)}
-                />
-              ))}
+              {blocks.map((b, i) => {
+                const map = findBlock(doc, kind, b.id);
+                if (!map) return null;
+                return (
+                  <SortableBlock
+                    key={b.id}
+                    block={b}
+                    kind={kind}
+                    index={i}
+                    titleText={blockText(map, "title")}
+                    paragraphText={blockText(map, "paragraph")}
+                    onUpdate={(p) => onUpdate(b.id, p)}
+                    onRemove={() => onRemove(b.id)}
+                  />
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
@@ -255,12 +270,11 @@ function BlockSection({
           {full ? `Maximum ${max} blocks` : `Add ${title} block`}
         </button>
 
-        {onCustom && (
+        {customText && (
           <div className="pt-1">
-            <TextArea
+            <CollabTextAreaField
               label={customLabel}
-              value={customValue ?? ""}
-              onChange={onCustom}
+              text={customText}
               placeholder={customPlaceholder}
               rows={4}
             />
@@ -302,107 +316,37 @@ function VerdictRow({
 /* ============================================================ EDITOR */
 export function ReportEditor({ id }: { id: string }) {
   const router = useRouter();
-  const [report, setReport] = useState<StoredReport | null>(null);
-  const [data, setData] = useState<ReportData | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "missing">("loading");
   const [busy, setBusy] = useState<Busy>("idle");
-  const [saveState, setSaveState] = useState<SaveState>("idle");
   const fileRef = useRef<HTMLInputElement>(null);
-  /* The load below sets `data`, which would otherwise trip a pointless
-     round-trip to Supabase the moment a report is opened. */
-  const skipNextSave = useRef(true);
 
-  /* load */
-  useEffect(() => {
-    let cancelled = false;
-    setStatus("loading");
-    skipNextSave.current = true;
+  /*
+   * The report is a shared CRDT document rather than local state: every edit is
+   * a merge, so two people can work in the same report — the same paragraph,
+   * even — without either one's changes being overwritten. There is no autosave
+   * debounce to manage any more; the provider owns persistence.
+   */
+  const {
+    status,
+    data,
+    doc,
+    patch,
+    patchAnalytics,
+    patchSocials,
+    patchReferrers,
+    patchPage3,
+    addBlock,
+    updateBlock,
+    removeBlock,
+    reorderBlock,
+    addCustomSocial,
+    updateCustomSocial,
+    removeCustomSocial,
+    resetAll,
+  } = useCollabReport(id);
 
-    getReport(id).then((r) => {
-      if (cancelled) return;
-      if (r) {
-        setReport(r);
-        setData(r.data);
-        setStatus("ready");
-      } else {
-        setStatus("missing");
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  /* autosave */
-  useEffect(() => {
-    if (status !== "ready" || !report || !data) return;
-    if (skipNextSave.current) {
-      skipNextSave.current = false;
-      return;
-    }
-
-    // Longer debounce than the old localStorage write — this is a network call
-    // now, and typing a paragraph should not be one request per keystroke.
-    const t = setTimeout(async () => {
-      setSaveState("saving");
-      const ok = await saveReport({ ...report, data });
-      setSaveState(ok ? "saved" : "error");
-      if (ok) setTimeout(() => setSaveState("idle"), 1500);
-    }, 800);
-
-    return () => clearTimeout(t);
-  }, [data, report, status]);
-
-  /* -------- updaters -------- */
-  const patch = (p: Partial<ReportData>) =>
-    setData((d) => (d ? { ...d, ...p } : d));
-  const patchAnalytics = (p: Partial<ReportData["analytics"]>) =>
-    setData((d) => (d ? { ...d, analytics: { ...d.analytics, ...p } } : d));
-  const patchSocials = (p: Partial<ReportData["socials"]>) =>
-    setData((d) => (d ? { ...d, socials: { ...d.socials, ...p } } : d));
-  const patchReferrers = (p: Partial<ReportData["referrers"]>) =>
-    setData((d) => (d ? { ...d, referrers: { ...d.referrers, ...p } } : d));
-  const patchPage3 = (p: Partial<ReportData["page3"]>) =>
-    setData((d) => (d ? { ...d, page3: { ...d.page3, ...p } } : d));
-
-  const listKey = (k: BlockKind): "goodBlocks" | "badBlocks" =>
-    k === "good" ? "goodBlocks" : "badBlocks";
-
-  const addBlock = (kind: BlockKind) =>
-    setData((d) => {
-      if (!d) return d;
-      const key = listKey(kind);
-      if (d[key].length >= maxBlocks(kind)) return d;
-      return {
-        ...d,
-        [key]: [
-          ...d[key],
-          createBlock({ icon: kind === "good" ? "star" : "alert-triangle" }),
-        ],
-      };
-    });
-  const updateBlock = (kind: BlockKind, blockId: string, p: Partial<Block>) =>
-    setData((d) =>
-      d
-        ? {
-            ...d,
-            [listKey(kind)]: d[listKey(kind)].map((b) =>
-              b.id === blockId ? { ...b, ...p } : b,
-            ),
-          }
-        : d,
-    );
-  const removeBlock = (kind: BlockKind, blockId: string) =>
-    setData((d) =>
-      d
-        ? { ...d, [listKey(kind)]: d[listKey(kind)].filter((b) => b.id !== blockId) }
-        : d,
-    );
-  const reorderBlock = (kind: BlockKind, from: number, to: number) =>
-    setData((d) =>
-      d ? { ...d, [listKey(kind)]: arrayMove(d[listKey(kind)], from, to) } : d,
-    );
+  const { byReport, me } = usePresence(id);
+  // Everyone in this report except this browser.
+  const others = (byReport.get(id) ?? []).filter((u) => u.email !== me);
 
   /* logo */
   const onPickLogo = async (file: File | null) => {
@@ -411,29 +355,12 @@ export function ReportEditor({ id }: { id: string }) {
     patch({ logo });
   };
 
-  /* custom socials */
-  const addCustomSocial = () =>
-    data &&
-    patchSocials({
-      custom: [...data.socials.custom, { id: uid(), label: "", value: "" }],
-    });
-  const updateCustomSocial = (
-    cid: string,
-    p: Partial<{ label: string; value: string }>,
-  ) =>
-    data &&
-    patchSocials({
-      custom: data.socials.custom.map((c) => (c.id === cid ? { ...c, ...p } : c)),
-    });
-  const removeCustomSocial = (cid: string) =>
-    data && patchSocials({ custom: data.socials.custom.filter((c) => c.id !== cid) });
-
   const clearFields = () => {
     if (confirm("Clear every field in this report? This cannot be undone.")) {
       const fresh = createInitialData();
       fresh.goodBlocks = [];
       fresh.badBlocks = [];
-      setData(fresh);
+      resetAll(fresh);
     }
   };
 
@@ -491,14 +418,14 @@ export function ReportEditor({ id }: { id: string }) {
     [data],
   );
 
-  if (status === "loading") {
+  if (status === "connecting") {
     return (
       <div className="app-bg grid min-h-screen place-items-center">
         <Loader2 className="animate-spin text-ink-soft" size={22} />
       </div>
     );
   }
-  if (status === "missing" || !data || !metrics || !health || !completion) {
+  if (status === "missing") {
     return (
       <div className="app-bg grid min-h-screen place-items-center px-6 text-center">
         <div>
@@ -512,6 +439,38 @@ export function ReportEditor({ id }: { id: string }) {
           >
             <ArrowLeft size={15} /> Back to reports
           </button>
+        </div>
+      </div>
+    );
+  }
+  /* A failed connection is not a missing report — saying so would send people
+     looking for a report that is sitting there intact. */
+  if (!doc || !data || !metrics || !health || !completion) {
+    return (
+      <div className="app-bg grid min-h-screen place-items-center px-6 text-center">
+        <div>
+          <CloudOff className="mx-auto mb-3 text-danger" size={24} />
+          <p className="text-[15px] font-semibold text-ink">
+            Could not open this report
+          </p>
+          <p className="mt-1 max-w-sm text-[13px] text-ink-soft">
+            The connection to the shared document failed. Nothing has been lost —
+            reload to try again.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-[13px] font-semibold text-white"
+            >
+              Reload
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-black/10 bg-white px-4 py-2 text-[13px] font-semibold text-ink-soft"
+            >
+              <ArrowLeft size={15} /> Back to reports
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -550,24 +509,9 @@ export function ReportEditor({ id }: { id: string }) {
                 </span>
               </div>
               <span className="flex items-center gap-2 text-[12px] text-ink-soft">
-                <span
-                  className={cx(
-                    "flex items-center gap-1",
-                    saveState === "error" && "font-semibold text-danger",
-                  )}
-                >
-                  {saveState === "error" ? (
-                    <CloudOff size={12} />
-                  ) : (
-                    <Cloud size={12} />
-                  )}
-                  {saveState === "saving"
-                    ? "Saving…"
-                    : saveState === "saved"
-                      ? "Saved"
-                      : saveState === "error"
-                        ? "Not saved — retrying on next edit"
-                        : "Autosaves"}
+                <span className="flex items-center gap-1">
+                  <Cloud size={12} />
+                  {others.length > 0 ? "Shared — live" : "Saves as you type"}
                 </span>
                 <span className="text-black/20">·</span>
                 <span className="font-semibold text-brand-600">
@@ -578,6 +522,11 @@ export function ReportEditor({ id }: { id: string }) {
           </div>
 
           <div className="flex items-center gap-2">
+            {others.length > 0 && (
+              <div className="mr-1 hidden sm:block">
+                <PresenceAvatars users={others} size={28} />
+              </div>
+            )}
             <button
               onClick={clearFields}
               className="hidden items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink-soft transition hover:bg-black/[0.03] sm:flex"
@@ -618,6 +567,27 @@ export function ReportEditor({ id }: { id: string }) {
           />
         </div>
       </header>
+
+      {/* Who else is in here. Informational, not a warning: edits merge, so the
+          only thing worth saying is that changes will appear as they happen. */}
+      {others.length > 0 && (
+        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <div className="flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-2.5">
+            <Users size={16} className="shrink-0 text-brand-600" />
+            <PresenceAvatars users={others} size={24} />
+            <p className="min-w-0 text-[13px] leading-snug text-ink">
+              <span className="font-semibold">
+                {others.length === 1
+                  ? `${others[0].email} is in this report`
+                  : `${others.length} others are in this report`}
+              </span>
+              <span className="block text-ink-soft">
+                You can both edit — changes appear as they are typed.
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Body */}
       <main className="mx-auto grid max-w-6xl grid-cols-1 gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[1fr_320px]">
@@ -981,13 +951,13 @@ export function ReportEditor({ id }: { id: string }) {
             icon={<ThumbsUp size={18} />}
             blocks={data.goodBlocks}
             max={maxBlocks("good")}
+            doc={doc}
             onAdd={() => addBlock("good")}
             onUpdate={(bid, p) => updateBlock("good", bid, p)}
             onRemove={(bid) => removeBlock("good", bid)}
             onReorder={(from, to) => reorderBlock("good", from, to)}
             customLabel="Custom paragraph — “Success is Multi-Faceted” (Page 1)"
-            customValue={data.goodCustom}
-            onCustom={(v) => patch({ goodCustom: v })}
+            customText={proseText(doc, "goodCustom")}
             customPlaceholder="A short closing note celebrating what's working across the store…"
           />
 
@@ -999,6 +969,7 @@ export function ReportEditor({ id }: { id: string }) {
             icon={<ThumbsDown size={18} />}
             blocks={data.badBlocks}
             max={maxBlocks("bad")}
+            doc={doc}
             onAdd={() => addBlock("bad")}
             onUpdate={(bid, p) => updateBlock("bad", bid, p)}
             onRemove={(bid) => removeBlock("bad", bid)}
@@ -1012,28 +983,24 @@ export function ReportEditor({ id }: { id: string }) {
             icon={<Sparkles size={18} />}
           >
             <div className="space-y-4">
-              <TextArea
+              <CollabTextAreaField
                 label="Food for Thought — psychological-game passage (Page 1)"
-                value={data.foodForThought}
-                onChange={(v) => patch({ foodForThought: v })}
+                text={proseText(doc, "foodForThought")}
                 rows={6}
               />
-              <TextArea
+              <CollabTextAreaField
                 label="Conversion Rate note (Page 3)"
-                value={data.page3.conversionNote}
-                onChange={(v) => patchPage3({ conversionNote: v })}
+                text={page3Text(doc, "conversionNote")}
                 rows={3}
               />
-              <TextArea
+              <CollabTextAreaField
                 label="Average Order Value note (Page 3)"
-                value={data.page3.aovNote}
-                onChange={(v) => patchPage3({ aovNote: v })}
+                text={page3Text(doc, "aovNote")}
                 rows={3}
               />
-              <TextArea
+              <CollabTextAreaField
                 label="Add to Cart vs Conversion note (Page 3)"
-                value={data.page3.addToCartNote}
-                onChange={(v) => patchPage3({ addToCartNote: v })}
+                text={page3Text(doc, "addToCartNote")}
                 rows={3}
               />
             </div>
@@ -1045,9 +1012,8 @@ export function ReportEditor({ id }: { id: string }) {
             description="The main passage to your client. One action per paragraph — start each with a bold lead-in and a colon."
             icon={<FileText size={18} />}
           >
-            <TextArea
-              value={data.actionPlan}
-              onChange={(v) => patch({ actionPlan: v })}
+            <CollabTextArea
+              text={proseText(doc, "actionPlan")}
               rows={12}
               placeholder={
                 "Ditch the Cookie Pop-up: The site currently features a cookie consent banner...\n\nFooter Wasteland: There is excessive, empty white space down in your footer..."

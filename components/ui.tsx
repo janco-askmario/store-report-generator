@@ -74,7 +74,8 @@ export function Label({
   );
 }
 
-const inputBase =
+/** Shared by the plain fields here and the collaborative ones in CollabField. */
+export const inputBase =
   "w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-brand-400 focus:ring-4 focus:ring-brand-100";
 
 export function Field({

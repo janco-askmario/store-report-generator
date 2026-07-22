@@ -2,7 +2,9 @@
 
 import type { HTMLAttributes } from "react";
 import { Check, GripVertical, Trash2 } from "lucide-react";
+import type * as Y from "yjs";
 import type { Block } from "@/lib/types";
+import { CollabInput, CollabTextArea } from "./CollabField";
 import { IconPicker } from "./IconPicker";
 import { StarRating } from "./StarRating";
 import { cx } from "./ui";
@@ -36,6 +38,8 @@ export function BlockEditor({
   block,
   kind,
   index,
+  titleText,
+  paragraphText,
   onChange,
   onRemove,
   dragHandleProps,
@@ -44,6 +48,11 @@ export function BlockEditor({
   block: Block;
   kind: Kind;
   index: number;
+  /* Text binds to the shared document directly so two people can type in the
+     same block; the rest of the block (icon, rating, highlight) is last-write-
+     wins through `onChange`, which is the right resolution for a single choice. */
+  titleText: Y.Text;
+  paragraphText: Y.Text;
   onChange: (patch: Partial<Block>) => void;
   onRemove: () => void;
   dragHandleProps?: HTMLAttributes<HTMLButtonElement>;
@@ -79,9 +88,8 @@ export function BlockEditor({
         </div>
 
         <div className="min-w-0 flex-1 space-y-2.5">
-          <input
-            value={block.title}
-            onChange={(e) => onChange({ title: e.target.value })}
+          <CollabInput
+            text={titleText}
             placeholder={
               kind === "good"
                 ? "What's great? e.g. Positive reviews on home page"
@@ -89,9 +97,8 @@ export function BlockEditor({
             }
             className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[14px] font-semibold text-ink outline-none transition placeholder:font-normal placeholder:text-ink-soft/50 focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
           />
-          <textarea
-            value={block.paragraph}
-            onChange={(e) => onChange({ paragraph: e.target.value })}
+          <CollabTextArea
+            text={paragraphText}
             rows={3}
             placeholder="Short paragraph explaining it to the client…"
             className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
