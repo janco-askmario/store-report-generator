@@ -2,7 +2,8 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, FileText, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cx } from "@/components/ui";
 
@@ -111,9 +112,17 @@ function LoginForm() {
   return (
     <>
       <div className="mb-6 text-center">
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-md shadow-brand-500/30">
-          <FileText size={26} />
-        </div>
+        {/* Sized by height, width auto — the logo is a 2.8:1 wordmark, so a
+            fixed square would squash it. No gradient tile behind it either: it
+            carries its own purple and green. */}
+        <Image
+          src="/AskMario-logo.png"
+          alt="AskMario"
+          width={1400}
+          height={500}
+          priority
+          className="mx-auto mb-4 h-11 w-auto"
+        />
         <h1 className="text-[18px] font-semibold tracking-tight text-ink">
           Store Reports
         </h1>

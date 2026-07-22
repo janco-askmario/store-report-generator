@@ -581,9 +581,7 @@ export function ReportEditor({ id }: { id: string }) {
                   ? `${others[0].email} is in this report`
                   : `${others.length} others are in this report`}
               </span>
-              <span className="block text-ink-soft">
-                You can both edit — changes appear as they are typed.
-              </span>
+              <span className="block text-ink-soft">You can both edit.</span>
             </p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Copy,
@@ -133,20 +134,21 @@ export function ReportsLibrary() {
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-md shadow-brand-500/30">
-              <FileText size={20} />
-            </div>
+            {/* Sized by height, width auto — a 2.8:1 wordmark in a fixed square
+                would squash it. The divider keeps it from reading as one phrase
+                with the page title. */}
+            <Image
+              src="/AskMario-logo.png"
+              alt="AskMario"
+              width={1400}
+              height={500}
+              priority
+              className="h-8 w-auto"
+            />
+            <span aria-hidden className="h-6 w-px bg-black/10" />
             <div className="leading-tight">
-              <div className="flex items-center gap-2">
-                <span className="text-[15px] font-semibold tracking-tight text-ink">
-                  Store Reports
-                </span>
-                <span className="rounded-full bg-leaf-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-leaf-700">
-                  AskMario
-                </span>
-              </div>
-              <span className="text-[12px] text-ink-soft">
-                Your Shopify store audit reports
+              <span className="text-[19px] font-semibold tracking-tight text-ink">
+                Store Reports
               </span>
             </div>
           </div>
@@ -293,23 +295,15 @@ function ReportCard({
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
-          <span className="rounded-full bg-leaf-50 px-2 py-0.5 text-[11px] font-semibold text-leaf-700">
-            {data.goodBlocks.length} good
-          </span>
-          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-danger">
-            {data.badBlocks.length} to fix
-          </span>
-          {viewers.length > 0 && (
-            <span
-              className="ml-auto flex items-center gap-1.5 pl-1"
-              title={`In this report now:\n${viewers.map((v) => v.email).join("\n")}`}
-            >
-              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-leaf-500" />
-              <PresenceAvatars users={viewers} size={20} max={3} />
-            </span>
-          )}
-        </div>
+        {viewers.length > 0 && (
+          <div
+            className="mt-3 flex items-center gap-1.5"
+            title={`In this report now:\n${viewers.map((v) => v.email).join("\n")}`}
+          >
+            <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-leaf-500" />
+            <PresenceAvatars users={viewers} size={20} max={3} />
+          </div>
+        )}
       </button>
 
       <div className="flex items-center gap-1 border-t border-black/5 px-3 py-2">
