@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
+  ArrowUpDown,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   CloudUpload,
   FileText,
@@ -11,6 +15,7 @@ import {
   Loader2,
   LogOut,
   Pencil,
+  Search,
   Store,
   Trash2,
 } from "lucide-react";
@@ -38,12 +43,97 @@ function fmtDate(ts: number): string {
   });
 }
 
+const PAGE_SIZE = 50;
+
+type SortKey =
+  | "updated"
+  | "created"
+  | "name-asc"
+  | "name-desc"
+  | "health-desc"
+  | "health-asc";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  updated: "Recently updated",
+  created: "Recently created",
+  "name-asc": "Name (A–Z)",
+  "name-desc": "Name (Z–A)",
+  "health-desc": "Health (high–low)",
+  "health-asc": "Health (low–high)",
+};
+
 export function ReportsLibrary() {
   const router = useRouter();
   const [reports, setReports] = useState<StoredReport[] | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [legacyCount, setLegacyCount] = useState(0);
   const [importing, setImporting] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("updated");
+  const [page, setPage] = useState(0);
+
+  const q = query.trim().toLowerCase();
+
+  // Search (name + URL) then sort. Memoised so unrelated re-renders — presence
+  // pings, realtime refetches — don't re-run it on every keystroke.
+  const visible = useMemo(() => {
+    if (!reports) return null;
+    const rows = q
+      ? reports.filter(
+          (r) =>
+            r.data.storeName.toLowerCase().includes(q) ||
+            r.data.storeUrl.toLowerCase().includes(q),
+        )
+      : reports.slice();
+
+    const byName = (a: StoredReport, b: StoredReport) =>
+      a.data.storeName.localeCompare(b.data.storeName, undefined, {
+        sensitivity: "base",
+      });
+
+    switch (sort) {
+      case "updated":
+        rows.sort((a, b) => b.updatedAt - a.updatedAt);
+        break;
+      case "created":
+        rows.sort((a, b) => b.createdAt - a.createdAt);
+        break;
+      case "name-asc":
+        rows.sort(byName);
+        break;
+      case "name-desc":
+        rows.sort((a, b) => byName(b, a));
+        break;
+      case "health-desc":
+      case "health-asc": {
+        const dir = sort === "health-desc" ? -1 : 1;
+        const scores = new Map(
+          rows.map((r) => [r.id, computeHealth(r.data).score]),
+        );
+        rows.sort((a, b) => {
+          const sa = scores.get(a.id) ?? null;
+          const sb = scores.get(b.id) ?? null;
+          // Unrated reports have no score — always sink them to the bottom.
+          if (sa == null && sb == null) return 0;
+          if (sa == null) return 1;
+          if (sb == null) return -1;
+          return dir * (sa - sb);
+        });
+        break;
+      }
+    }
+    return rows;
+  }, [reports, q, sort]);
+
+  // Jump back to the first page whenever the result set changes under our feet.
+  useEffect(() => setPage(0), [q, sort]);
+
+  const total = visible?.length ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageItems = visible
+    ? visible.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+    : [];
 
   const { byReport } = usePresence(null);
 
@@ -212,30 +302,115 @@ export function ReportsLibrary() {
           <EmptyState onNew={onNew} />
         ) : (
           <>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h1 className="text-[13px] font-semibold uppercase tracking-wide text-ink-soft">
-                {reports.length} report{reports.length > 1 ? "s" : ""}
+                {q
+                  ? `${total} of ${reports.length} report${reports.length > 1 ? "s" : ""}`
+                  : `${reports.length} report${reports.length > 1 ? "s" : ""}`}
               </h1>
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                  />
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search by store name or URL…"
+                    aria-label="Search reports"
+                    className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-[13px] text-ink shadow-sm outline-none transition placeholder:text-ink-soft/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                  />
+                </div>
+                <div className="relative">
+                  <ArrowUpDown
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                  />
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as SortKey)}
+                    aria-label="Sort reports"
+                    className="appearance-none rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-9 text-[13px] font-medium text-ink shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                  >
+                    {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                      <option key={k} value={k}>
+                        {SORT_LABELS[k]}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={15}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {reports.map((r) => (
-                <ReportCard
-                  key={r.id}
-                  report={r}
-                  viewers={byReport.get(r.id) ?? []}
-                  onOpen={() => router.push(`/report/${r.id}`)}
-                  onDuplicate={() => onDuplicate(r.id)}
-                  onDelete={() => onDelete(r.id, r.data.storeName)}
-                />
-              ))}
-              <button
-                onClick={onNew}
-                className="flex min-h-[172px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-white/40 text-brand-600 transition hover:border-brand-400 hover:bg-brand-50"
-              >
-                <FilePlus2 size={24} />
-                <span className="text-[14px] font-semibold">New report</span>
-              </button>
-            </div>
+            {total === 0 ? (
+              <div className="grid place-items-center rounded-2xl border border-dashed border-black/10 bg-white/40 py-16 text-center">
+                <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-black/[0.03] text-ink-soft">
+                  <Search size={22} />
+                </div>
+                <p className="text-[14px] font-semibold text-ink">
+                  No reports match “{query.trim()}”
+                </p>
+                <p className="mt-1 text-[13px] text-ink-soft">
+                  Try a different store name or URL.
+                </p>
+                <button
+                  onClick={() => setQuery("")}
+                  className="mt-4 rounded-lg px-3 py-1.5 text-[13px] font-medium text-brand-700 transition hover:bg-brand-50"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {pageItems.map((r) => (
+                    <ReportCard
+                      key={r.id}
+                      report={r}
+                      viewers={byReport.get(r.id) ?? []}
+                      onOpen={() => router.push(`/report/${r.id}`)}
+                      onDuplicate={() => onDuplicate(r.id)}
+                      onDelete={() => onDelete(r.id, r.data.storeName)}
+                    />
+                  ))}
+                  {!q && safePage === pageCount - 1 && (
+                    <button
+                      onClick={onNew}
+                      className="flex min-h-[172px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-white/40 text-brand-600 transition hover:border-brand-400 hover:bg-brand-50"
+                    >
+                      <FilePlus2 size={24} />
+                      <span className="text-[14px] font-semibold">New report</span>
+                    </button>
+                  )}
+                </div>
+                {pageCount > 1 && (
+                  <div className="mt-6 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => setPage(safePage - 1)}
+                      disabled={safePage === 0}
+                      className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      <ChevronLeft size={16} /> Prev
+                    </button>
+                    <span className="px-2 text-[13px] text-ink-soft">
+                      Page {safePage + 1} of {pageCount}
+                    </span>
+                    <button
+                      onClick={() => setPage(safePage + 1)}
+                      disabled={safePage >= pageCount - 1}
+                      className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      Next <ChevronRight size={16} />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </>
         )}
       </main>
