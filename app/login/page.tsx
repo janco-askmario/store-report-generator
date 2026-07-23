@@ -102,6 +102,11 @@ function LoginForm() {
         setSubmitting(false);
         return;
       }
+      // New accounts start unapproved — send them to the holding page rather
+      // than the app, which the middleware would bounce them out of anyway.
+      router.push("/pending");
+      router.refresh();
+      return;
     }
 
     goToApp();
@@ -128,7 +133,7 @@ function LoginForm() {
         </h1>
         <p className="mt-1 text-[13px] text-ink-soft">
           {isSignup
-            ? "Create an account to join the AskMario report library."
+            ? "Create an account with your AskMario email — an admin approves it before you can sign in."
             : "Sign in to open the AskMario report library."}
         </p>
       </div>

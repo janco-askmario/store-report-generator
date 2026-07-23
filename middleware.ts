@@ -51,7 +51,9 @@ export async function middleware(request: NextRequest) {
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
 
-  if (!user && !isPublic) {
+  // Not signed in: only the login and auth-callback pages are reachable.
+  if (!user) {
+    if (isPublic) return supabaseResponse;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     // Send them back where they were headed once they're in.
@@ -59,7 +61,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && pathname === "/login") {
+  // Signed in, but access is gated on admin approval (see the account_approval
+  // migration). One extra round trip per request, which is fine for an internal
+  // tool — and this is only UX: the RLS policies are the real gate, so an
+  // unapproved account that reached the app anyway would still see nothing.
+  const { data: approved } = await supabase.rpc("is_approved");
+
+  if (!approved) {
+    // Let the auth callback finish its own redirect; funnel everything else to
+    // the holding page. `/pending` itself is reachable so it can render.
+    if (pathname === "/pending" || pathname.startsWith("/auth")) {
+      return supabaseResponse;
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/pending";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // Approved: keep them out of the login and holding pages.
+  if (pathname === "/login" || pathname === "/pending") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
