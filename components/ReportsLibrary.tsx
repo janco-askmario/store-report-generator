@@ -30,6 +30,13 @@ import {
   readLegacyReports,
 } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
+import {
+  DEV_SEED_CLICKS,
+  DEV_SEED_COUNT,
+  deleteDevReports,
+  isDevSeed,
+  seedDevReports,
+} from "@/lib/dev-seed";
 import { computeHealth } from "@/lib/scoring";
 import { type PresentUser, usePresence } from "@/lib/presence";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
@@ -72,6 +79,10 @@ export function ReportsLibrary() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("updated");
   const [page, setPage] = useState(0);
+  const [devClicks, setDevClicks] = useState(0);
+  const [devBusy, setDevBusy] = useState(false);
+  const [devStatus, setDevStatus] = useState<string | null>(null);
+  const devClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const q = query.trim().toLowerCase();
 
@@ -232,6 +243,82 @@ export function ReportsLibrary() {
     router.refresh();
   };
 
+  /*
+   * Dev test data (see lib/dev-seed.ts).
+   *
+   * Ten clicks on the logo seed the library with 200 throwaway reports; ten more
+   * clear them. Which of the two happens is decided by whether any seeds are
+   * currently in the library, so the same gesture toggles.
+   */
+  const devSeedIds = useMemo(
+    () => (reports ?? []).filter(isDevSeed).map((r) => r.id),
+    [reports],
+  );
+
+  const runDevSeed = async (clearing: boolean) => {
+    setDevBusy(true);
+    if (clearing) {
+      const n = await deleteDevReports(devSeedIds, (done, total) =>
+        setDevStatus(`Removing dev test reports… ${done}/${total}`),
+      );
+      setDevStatus(
+        n > 0 ? `Removed ${n} dev test reports` : "Nothing to remove",
+      );
+    } else {
+      setDevStatus(`Generating ${DEV_SEED_COUNT} dev test reports…`);
+      const n = await seedDevReports((done, total) =>
+        setDevStatus(`Generating dev test reports… ${done}/${total}`),
+      );
+      setDevStatus(
+        n > 0
+          ? `Generated ${n} dev test reports`
+          : "Could not generate — see the console",
+      );
+    }
+    await refresh();
+    setDevBusy(false);
+  };
+
+  const onLogoClick = () => {
+    if (devBusy) return;
+    if (devClickTimer.current) clearTimeout(devClickTimer.current);
+
+    const n = devClicks + 1;
+    if (n < DEV_SEED_CLICKS) {
+      setDevClicks(n);
+      // The streak has to be deliberate: a pause resets it, so stray clicks on
+      // the logo never add up to 200 reports. The countdown only shows once
+      // someone is clearly mid-gesture.
+      if (n >= DEV_SEED_CLICKS - 5) {
+        setDevStatus(
+          devSeedIds.length > 0
+            ? `${DEV_SEED_CLICKS - n} more to remove dev test reports`
+            : `${DEV_SEED_CLICKS - n} more to generate dev test reports`,
+        );
+      }
+      devClickTimer.current = setTimeout(() => setDevClicks(0), 1200);
+      return;
+    }
+
+    setDevClicks(0);
+    void runDevSeed(devSeedIds.length > 0);
+  };
+
+  useEffect(
+    () => () => {
+      if (devClickTimer.current) clearTimeout(devClickTimer.current);
+    },
+    [],
+  );
+
+  // Progress messages replace each other while the seed runs; the final one
+  // clears itself shortly after.
+  useEffect(() => {
+    if (!devStatus || devBusy) return;
+    const t = setTimeout(() => setDevStatus(null), 3500);
+    return () => clearTimeout(t);
+  }, [devStatus, devBusy]);
+
   return (
     <div className="app-bg min-h-screen">
       {/* Top bar */}
@@ -240,15 +327,24 @@ export function ReportsLibrary() {
           <div className="flex items-center gap-3">
             {/* Sized by height, width auto — a 2.8:1 wordmark in a fixed square
                 would squash it. The divider keeps it from reading as one phrase
-                with the page title. */}
-            <Image
-              src="/AskMario-logo.png"
-              alt="AskMario"
-              width={1400}
-              height={500}
-              priority
-              className="h-8 w-auto"
-            />
+                with the page title. The button around it is the dev-test-data
+                trigger — see onLogoClick; the image alt is empty because the
+                button already carries the name. */}
+            <button
+              type="button"
+              onClick={onLogoClick}
+              aria-label="AskMario"
+              className="shrink-0 rounded-lg outline-none transition active:scale-95"
+            >
+              <Image
+                src="/AskMario-logo.png"
+                alt=""
+                width={1400}
+                height={500}
+                priority
+                className="h-8 w-auto"
+              />
+            </button>
             <span aria-hidden className="h-6 w-px bg-black/10" />
             <div className="leading-tight">
               <span className="text-[19px] font-semibold tracking-tight text-ink">
@@ -439,6 +535,18 @@ export function ReportsLibrary() {
           <TeamPanel presence={presence} reportNames={reportNames} />
         </aside>
       </div>
+
+      {devStatus && (
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2"
+        >
+          <div className="flex items-center gap-2 rounded-xl bg-ink/90 px-3.5 py-2 text-[13px] font-medium text-white shadow-lg backdrop-blur">
+            {devBusy && <Loader2 size={14} className="animate-spin" />}
+            {devStatus}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
