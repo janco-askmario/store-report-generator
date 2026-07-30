@@ -33,6 +33,7 @@ import { createClient } from "@/lib/supabase/client";
 import { computeHealth } from "@/lib/scoring";
 import { type PresentUser, usePresence } from "@/lib/presence";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
+import { TeamPanel } from "@/components/TeamPanel";
 import { cx } from "@/components/ui";
 
 function fmtDate(ts: number): string {
@@ -135,7 +136,20 @@ export function ReportsLibrary() {
     ? visible.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
     : [];
 
-  const { byReport } = usePresence(null);
+  // One subscription for the whole dashboard: the cards badge themselves from
+  // `byReport`, the team panel reads the same state rather than opening a second
+  // channel (which would publish this tab twice).
+  const presence = usePresence(null);
+  const { byReport } = presence;
+
+  // Lets the team panel name the report a teammate is in.
+  const reportNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of reports ?? []) {
+      map.set(r.id, r.data.storeName || "Untitled report");
+    }
+    return map;
+  }, [reports]);
 
   const refresh = async () => setReports(await listReports());
   // The realtime effect below must not re-subscribe every render just to reach
@@ -222,7 +236,7 @@ export function ReportsLibrary() {
     <div className="app-bg min-h-screen">
       {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             {/* Sized by height, width auto — a 2.8:1 wordmark in a fixed square
                 would squash it. The divider keeps it from reading as one phrase
@@ -261,159 +275,170 @@ export function ReportsLibrary() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        {legacyCount > 0 && (
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-brand-600">
-                <CloudUpload size={16} />
-              </div>
-              <div className="text-[13px] leading-snug text-ink">
-                <span className="font-semibold">
-                  {legacyCount} report{legacyCount > 1 ? "s" : ""} saved in this browser
-                </span>
-                <span className="block text-ink-soft">
-                  From before reports synced to the cloud. Upload to keep
-                  {legacyCount > 1 ? " them" : " it"} on your account.
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={onImportLegacy}
-              disabled={importing}
-              className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
-            >
-              {importing ? (
-                <>
-                  <Loader2 size={15} className="animate-spin" /> Uploading…
-                </>
-              ) : (
-                "Upload to cloud"
-              )}
-            </button>
-          </div>
-        )}
-
-        {reports === null ? (
-          <div className="grid place-items-center py-24">
-            <Loader2 className="animate-spin text-ink-soft" size={22} />
-          </div>
-        ) : reports.length === 0 ? (
-          <EmptyState onNew={onNew} />
-        ) : (
-          <>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h1 className="text-[13px] font-semibold uppercase tracking-wide text-ink-soft">
-                {q
-                  ? `${total} of ${reports.length} report${reports.length > 1 ? "s" : ""}`
-                  : `${reports.length} report${reports.length > 1 ? "s" : ""}`}
-              </h1>
-              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
-                  <Search
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
-                  />
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search by store name or URL…"
-                    aria-label="Search reports"
-                    className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-[13px] text-ink shadow-sm outline-none transition placeholder:text-ink-soft/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                  />
+      {/* Reports on the left, the team panel alongside on wide screens and
+          below the grid on narrow ones. */}
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row lg:items-start">
+        <main className="min-w-0 flex-1">
+          {legacyCount > 0 && (
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-brand-600">
+                  <CloudUpload size={16} />
                 </div>
-                <div className="relative">
-                  <ArrowUpDown
-                    size={15}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
-                  />
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value as SortKey)}
-                    aria-label="Sort reports"
-                    className="appearance-none rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-9 text-[13px] font-medium text-ink shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                  >
-                    {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-                      <option key={k} value={k}>
-                        {SORT_LABELS[k]}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={15}
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft"
-                  />
+                <div className="text-[13px] leading-snug text-ink">
+                  <span className="font-semibold">
+                    {legacyCount} report{legacyCount > 1 ? "s" : ""} saved in this browser
+                  </span>
+                  <span className="block text-ink-soft">
+                    From before reports synced to the cloud. Upload to keep
+                    {legacyCount > 1 ? " them" : " it"} on your account.
+                  </span>
                 </div>
               </div>
-            </div>
-            {total === 0 ? (
-              <div className="grid place-items-center rounded-2xl border border-dashed border-black/10 bg-white/40 py-16 text-center">
-                <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-black/[0.03] text-ink-soft">
-                  <Search size={22} />
-                </div>
-                <p className="text-[14px] font-semibold text-ink">
-                  No reports match “{query.trim()}”
-                </p>
-                <p className="mt-1 text-[13px] text-ink-soft">
-                  Try a different store name or URL.
-                </p>
-                <button
-                  onClick={() => setQuery("")}
-                  className="mt-4 rounded-lg px-3 py-1.5 text-[13px] font-medium text-brand-700 transition hover:bg-brand-50"
-                >
-                  Clear search
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {pageItems.map((r) => (
-                    <ReportCard
-                      key={r.id}
-                      report={r}
-                      viewers={byReport.get(r.id) ?? []}
-                      onOpen={() => router.push(`/report/${r.id}`)}
-                      onDuplicate={() => onDuplicate(r.id)}
-                      onDelete={() => onDelete(r.id, r.data.storeName)}
-                    />
-                  ))}
-                  {!q && safePage === pageCount - 1 && (
-                    <button
-                      onClick={onNew}
-                      className="flex min-h-[172px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-white/40 text-brand-600 transition hover:border-brand-400 hover:bg-brand-50"
-                    >
-                      <FilePlus2 size={24} />
-                      <span className="text-[14px] font-semibold">New report</span>
-                    </button>
-                  )}
-                </div>
-                {pageCount > 1 && (
-                  <div className="mt-6 flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => setPage(safePage - 1)}
-                      disabled={safePage === 0}
-                      className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
-                    >
-                      <ChevronLeft size={16} /> Prev
-                    </button>
-                    <span className="px-2 text-[13px] text-ink-soft">
-                      Page {safePage + 1} of {pageCount}
-                    </span>
-                    <button
-                      onClick={() => setPage(safePage + 1)}
-                      disabled={safePage >= pageCount - 1}
-                      className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
-                    >
-                      Next <ChevronRight size={16} />
-                    </button>
-                  </div>
+              <button
+                onClick={onImportLegacy}
+                disabled={importing}
+                className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+              >
+                {importing ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" /> Uploading…
+                  </>
+                ) : (
+                  "Upload to cloud"
                 )}
-              </>
-            )}
-          </>
-        )}
-      </main>
+              </button>
+            </div>
+          )}
+
+          {reports === null ? (
+            <div className="grid place-items-center py-24">
+              <Loader2 className="animate-spin text-ink-soft" size={22} />
+            </div>
+          ) : reports.length === 0 ? (
+            <EmptyState onNew={onNew} />
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h1 className="text-[13px] font-semibold uppercase tracking-wide text-ink-soft">
+                  {q
+                    ? `${total} of ${reports.length} report${reports.length > 1 ? "s" : ""}`
+                    : `${reports.length} report${reports.length > 1 ? "s" : ""}`}
+                </h1>
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                  <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+                    <Search
+                      size={16}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                    />
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search by store name or URL…"
+                      aria-label="Search reports"
+                      className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-[13px] text-ink shadow-sm outline-none transition placeholder:text-ink-soft/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                    />
+                  </div>
+                  <div className="relative">
+                    <ArrowUpDown
+                      size={15}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                    />
+                    <select
+                      value={sort}
+                      onChange={(e) => setSort(e.target.value as SortKey)}
+                      aria-label="Sort reports"
+                      className="appearance-none rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-9 text-[13px] font-medium text-ink shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                    >
+                      {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                        <option key={k} value={k}>
+                          {SORT_LABELS[k]}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={15}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                    />
+                  </div>
+                </div>
+              </div>
+              {total === 0 ? (
+                <div className="grid place-items-center rounded-2xl border border-dashed border-black/10 bg-white/40 py-16 text-center">
+                  <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-black/[0.03] text-ink-soft">
+                    <Search size={22} />
+                  </div>
+                  <p className="text-[14px] font-semibold text-ink">
+                    No reports match “{query.trim()}”
+                  </p>
+                  <p className="mt-1 text-[13px] text-ink-soft">
+                    Try a different store name or URL.
+                  </p>
+                  <button
+                    onClick={() => setQuery("")}
+                    className="mt-4 rounded-lg px-3 py-1.5 text-[13px] font-medium text-brand-700 transition hover:bg-brand-50"
+                  >
+                    Clear search
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Only three across once the viewport can afford it beside
+                      the team panel — at lg the cards would be ~220px wide. */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {pageItems.map((r) => (
+                      <ReportCard
+                        key={r.id}
+                        report={r}
+                        viewers={byReport.get(r.id) ?? []}
+                        onOpen={() => router.push(`/report/${r.id}`)}
+                        onDuplicate={() => onDuplicate(r.id)}
+                        onDelete={() => onDelete(r.id, r.data.storeName)}
+                      />
+                    ))}
+                    {!q && safePage === pageCount - 1 && (
+                      <button
+                        onClick={onNew}
+                        className="flex min-h-[172px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-white/40 text-brand-600 transition hover:border-brand-400 hover:bg-brand-50"
+                      >
+                        <FilePlus2 size={24} />
+                        <span className="text-[14px] font-semibold">New report</span>
+                      </button>
+                    )}
+                  </div>
+                  {pageCount > 1 && (
+                    <div className="mt-6 flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => setPage(safePage - 1)}
+                        disabled={safePage === 0}
+                        className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
+                      >
+                        <ChevronLeft size={16} /> Prev
+                      </button>
+                      <span className="px-2 text-[13px] text-ink-soft">
+                        Page {safePage + 1} of {pageCount}
+                      </span>
+                      <button
+                        onClick={() => setPage(safePage + 1)}
+                        disabled={safePage >= pageCount - 1}
+                        className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
+                      >
+                        Next <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </main>
+
+        {/* Sticky so it stays in view while the library scrolls. */}
+        <aside className="w-full shrink-0 lg:sticky lg:top-[76px] lg:w-72">
+          <TeamPanel presence={presence} reportNames={reportNames} />
+        </aside>
+      </div>
     </div>
   );
 }

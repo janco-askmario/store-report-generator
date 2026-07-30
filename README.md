@@ -41,6 +41,12 @@ across browsers and devices instead of living in one browser's `localStorage`.
      `report_updates` log, channel authorization and the compaction function.
    - `20260722100000_block_templates.sql` — the `block_templates` table backing
      the team's saved Good/Bad blocks.
+   - `20260723000000_account_approval.sql` — the `profiles` table and the
+     approval gate: new sign-ups land in a holding page until an admin flips
+     `approved`.
+   - `20260730000000_team_directory.sql` — lets approved users read the whole
+     `profiles` roster, which is what the dashboard's **Team** panel lists as
+     offline.
 
    The collab migration must be applied **before** deploying the code that uses
    it. Without `report_updates` the editor cannot open any report at all — it
@@ -48,6 +54,10 @@ across browsers and devices instead of living in one browser's `localStorage`.
 
    The block-templates migration is less severe: without it the built-in
    templates still work and only saving your own fails.
+
+   The team-directory migration is the mildest: without it RLS hands each user
+   only their own profile row, so the Team panel still shows everyone who is
+   online (that comes from presence, not the table) but nobody who is offline.
 
 3. **Lock down sign-ups** — Authentication → **Sign In / Providers** → turn off
    *Allow new users to sign up*, then invite teammates under Authentication →
@@ -77,6 +87,11 @@ across browsers and devices instead of living in one browser's `localStorage`.
   builders, editable narrative copy, and the action plan. A sticky "Live
   Analytics" panel shows the auto-calculated ratios. Everything autosaves to
   Supabase (debounced, with a save indicator in the top bar).
+- **Team panel** (`components/TeamPanel.tsx`) — the sidebar in the reports
+  library: everyone signed up to the app, split into who is online right now and
+  who isn't, updating live. Online comes from the Realtime presence channel
+  (`lib/presence.ts`) — which also says which report each person has open — and
+  the roster of everybody else from `public.profiles` (`lib/team.ts`).
 - **Auto-maths** (`lib/calc.ts`) — Conversion, AOV (gross ÷ orders),
   Add-to-Cart → Purchase %, fulfillment rate and device split are computed for
   you. Manual entries always win over the computed value.

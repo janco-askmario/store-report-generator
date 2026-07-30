@@ -34,6 +34,12 @@ export interface Presence {
   users: PresentUser[];
   /** Report id → the people in it, deduplicated by email. */
   byReport: Map<string, PresentUser[]>;
+  /**
+   * Lower-cased email → that person's live sessions, earliest first. One entry
+   * per open tab, so `has(email)` is the answer to "is this person online?"
+   * whether they have one tab open or five.
+   */
+  byEmail: Map<string, PresentUser[]>;
   /** This browser's email, once known. */
   me: string | null;
 }
@@ -169,5 +175,23 @@ export function usePresence(reportId: string | null): Presence {
     return map;
   }, [users]);
 
-  return { users, byReport, me };
+  /*
+   * Keyed on the lower-cased address because the roster's copy of an email comes
+   * from auth.users while presence's comes from the live session; a difference in
+   * case between the two would otherwise show someone as offline while they are
+   * looking at the page.
+   */
+  const byEmail = useMemo(() => {
+    const map = new Map<string, PresentUser[]>();
+    for (const u of users) {
+      const key = u.email.toLowerCase();
+      const list = map.get(key);
+      if (list) list.push(u);
+      else map.set(key, [u]);
+    }
+    for (const list of map.values()) list.sort((a, b) => a.joinedAt - b.joinedAt);
+    return map;
+  }, [users]);
+
+  return { users, byReport, byEmail, me };
 }
