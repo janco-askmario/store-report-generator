@@ -1,6 +1,7 @@
 import * as Y from "yjs";
 import type { Block, Page3Notes, ReportData } from "@/lib/types";
 import { normalizeData } from "@/lib/store";
+import { TEXT_ORIGIN } from "./text";
 
 /**
  * The Yjs shape of a report.
@@ -32,6 +33,17 @@ export type ProseField = "goodCustom" | "foodForThought" | "actionPlan";
 const ROOT = "report";
 
 export const SEED_ORIGIN = "seed";
+
+/**
+ * This browser's own deliberate edits — the ones undo is allowed to take back.
+ *
+ * Every mutator tags its transaction with it, which is what separates a change
+ * the user made from the incidental writes that happen while reading (the
+ * `ensure*` accessors below create missing nodes) and from a colleague's edits
+ * arriving over the wire. Undo that swallowed either of those would be a bug of
+ * the worst kind: it would silently revert somebody else's work.
+ */
+export const LOCAL_ORIGIN = "local";
 
 /** Plain (non-merged) scalar fields at the top level of a report. */
 const SCALARS = [
@@ -369,15 +381,41 @@ export function seedDoc(
  * Deliberately not `SEED_ORIGIN`: the provider treats seed transactions as
  * already-durable (bootstrap writes those itself), so clearing under that origin
  * would wipe the report on screen for everyone and never reach the database.
+ * `LOCAL_ORIGIN` also makes a mistaken "Clear" one press of undo away.
  */
-export function resetDoc(doc: Y.Doc, data: ReportData): void {
+export function resetDoc(
+  doc: Y.Doc,
+  data: ReportData,
+  origin: unknown = LOCAL_ORIGIN,
+): void {
   doc.transact(() => {
     const root = reportMap(doc);
     for (const key of Array.from(root.keys())) root.delete(key);
     // Nested transaction; Yjs folds it into this one, so peers never observe
     // the empty document in between.
-    seedDoc(doc, data, null);
-  }, null);
+    seedDoc(doc, data, origin);
+  }, origin);
+}
+
+/* --------------------------------------------------------------- undo/redo */
+
+/** Adjacent edits closer together than this collapse into one undo step. */
+const CAPTURE_TIMEOUT = 400;
+
+/**
+ * Undo/redo over the whole report.
+ *
+ * Scoped to the root map, so everything nested under it — blocks, their text,
+ * the analytics fields — is covered by one history. Only this browser's own
+ * edits are tracked (see `LOCAL_ORIGIN`); pressing undo can never reach into a
+ * colleague's changes, which is the behaviour every collaborative editor needs
+ * and the reason this is a `Y.UndoManager` rather than a stack of snapshots.
+ */
+export function createUndoManager(doc: Y.Doc): Y.UndoManager {
+  return new Y.UndoManager(reportMap(doc), {
+    trackedOrigins: new Set<unknown>([LOCAL_ORIGIN, TEXT_ORIGIN]),
+    captureTimeout: CAPTURE_TIMEOUT,
+  });
 }
 
 /* ---------------------------------------------------------------- snapshot */

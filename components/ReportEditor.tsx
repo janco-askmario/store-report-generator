@@ -35,12 +35,14 @@ import {
   ListChecks,
   Loader2,
   Plus,
+  Redo2,
   Share2,
   Sparkles,
   Store,
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  Undo2,
   Upload,
   Users,
   X,
@@ -74,6 +76,7 @@ import { type BlockTemplates, useBlockTemplates } from "@/lib/useBlockTemplates"
 import { BlockEditor } from "@/components/BlockEditor";
 import { BlockTemplatePicker } from "@/components/BlockTemplatePicker";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
+import { TeamDrawer } from "@/components/TeamDrawer";
 import { CollabTextArea, CollabTextAreaField } from "@/components/CollabField";
 import {
   Field,
@@ -375,11 +378,23 @@ export function ReportEditor({ id }: { id: string }) {
     updateCustomSocial,
     removeCustomSocial,
     resetAll,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useCollabReport(id);
 
-  const { byReport, me } = usePresence(id);
+  const presence = usePresence(id);
+  const { byReport, me } = presence;
   // Everyone in this report except this browser.
   const others = (byReport.get(id) ?? []).filter((u) => u.email !== me);
+  /* The team drawer names the report a teammate is in. Only this one is known
+     here — anyone editing elsewhere shows as "editing a report", which is true
+     and cheaper than pulling the whole library in to say which. */
+  const reportNames = useMemo(
+    () => new Map([[id, data?.storeName || "Untitled report"]]),
+    [id, data?.storeName],
+  );
 
   const templates = useBlockTemplates();
 
@@ -472,6 +487,43 @@ export function ReportEditor({ id }: { id: string }) {
     [data],
   );
 
+  /*
+   * The shortcuts people already have in their fingers: ⌘Z / ⌘⇧Z on a Mac,
+   * Ctrl+Z / Ctrl+⇧Z / Ctrl+Y on Windows and Linux.
+   *
+   * Bound on the window and always prevented, inside text fields included. The
+   * fields are bound to the shared document, so the browser's own undo is worse
+   * than useless there: it would restore text React never rendered and then fire
+   * a change event that writes that stale value back into the report as a fresh
+   * edit. One history, and it is the document's.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (key === "y" && !e.metaKey) {
+        // Ctrl+Y is redo on Windows and Linux; ⌘Y on a Mac is not.
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
+
+  // Which keys to name in the tooltips. Read after mount — the server has no way
+  // to know, and guessing would mismatch the markup it sent.
+  const [isMac, setIsMac] = useState(false);
+  useEffect(() => {
+    setIsMac(/mac|iphone|ipad|ipod/i.test(navigator.userAgent));
+  }, []);
+  const undoKeys = isMac ? "⌘Z" : "Ctrl+Z";
+  const redoKeys = isMac ? "⌘⇧Z" : "Ctrl+Shift+Z";
+
   if (status === "connecting") {
     return (
       <div className="app-bg grid min-h-screen place-items-center">
@@ -544,7 +596,9 @@ export function ReportEditor({ id }: { id: string }) {
       {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            {/* Same control, same corner, as on the dashboard. */}
+            <TeamDrawer presence={presence} reportNames={reportNames} />
             <button
               onClick={() => router.push("/")}
               className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-black/10 bg-white text-ink-soft transition hover:bg-black/[0.03]"
@@ -581,35 +635,64 @@ export function ReportEditor({ id }: { id: string }) {
                 <PresenceAvatars users={others} size={28} />
               </div>
             )}
+            {/* One control, two halves — undo and redo belong together. */}
+            <div className="flex items-center overflow-hidden rounded-xl border border-black/10 bg-white">
+              <button
+                onClick={undo}
+                disabled={!canUndo}
+                title={`Undo (${undoKeys})`}
+                aria-label="Undo"
+                aria-keyshortcuts={isMac ? "Meta+Z" : "Control+Z"}
+                className="grid h-10 w-10 place-items-center text-ink-soft transition hover:bg-black/[0.03] hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+              >
+                <Undo2 size={17} />
+              </button>
+              <span aria-hidden className="h-5 w-px bg-black/10" />
+              <button
+                onClick={redo}
+                disabled={!canRedo}
+                title={`Redo (${redoKeys})`}
+                aria-label="Redo"
+                aria-keyshortcuts={isMac ? "Meta+Shift+Z" : "Control+Shift+Z"}
+                className="grid h-10 w-10 place-items-center text-ink-soft transition hover:bg-black/[0.03] hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+              >
+                <Redo2 size={17} />
+              </button>
+            </div>
             <button
               onClick={clearFields}
               className="hidden items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink-soft transition hover:bg-black/[0.03] sm:flex"
             >
               <Eraser size={15} /> Clear
             </button>
+            {/* Labels drop away on a phone: the hamburger and the undo pair took
+                the room they used to have, and both actions are repeated in full
+                at the bottom of the form on anything narrower than xl. */}
             <button
               onClick={handlePreview}
               disabled={genDisabled}
-              className="flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3.5 py-2 text-[13px] font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
+              title="Preview the PDF"
+              className="flex h-10 items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 text-[13px] font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60 sm:px-3.5"
             >
               {busy === "preview" ? (
                 <Loader2 size={15} className="animate-spin" />
               ) : (
                 <Eye size={15} />
               )}
-              Preview
+              <span className="hidden sm:inline">Preview</span>
             </button>
             <button
               onClick={handleDownload}
               disabled={genDisabled}
-              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 disabled:opacity-60"
+              title="Generate the PDF"
+              className="flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 disabled:opacity-60 sm:px-4"
             >
               {busy === "download" ? (
                 <Loader2 size={15} className="animate-spin" />
               ) : (
                 <Download size={15} />
               )}
-              Generate PDF
+              <span className="hidden sm:inline">Generate PDF</span>
             </button>
           </div>
         </div>

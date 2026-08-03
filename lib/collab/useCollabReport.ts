@@ -1,17 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type * as Y from "yjs";
 import type { Block, ReportData } from "@/lib/types";
 import { createBlock, maxBlocks, uid } from "@/lib/defaults";
 import { applyTextDiff } from "./text";
 import {
   type BlockKind,
+  LOCAL_ORIGIN,
   analyticsMap,
   blockText,
   blocksArray,
   createBlockMap,
   createCustomSocial,
+  createUndoManager,
   customSocials,
   docToReportData,
   findBlock,
@@ -60,6 +62,12 @@ export interface CollabReport {
   removeCustomSocial: (id: string) => void;
 
   resetAll: (data: ReportData) => void;
+
+  /** Step back and forward through this browser's own edits. */
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 /**
@@ -109,6 +117,13 @@ export function useCollabReport(id: string): CollabReport {
 
   /* ------------------------------------------------------------- mutators */
 
+  /*
+   * Every mutator writes under `LOCAL_ORIGIN` — including the ones that only
+   * make a single change and would otherwise not need a transaction at all.
+   * That tag is what the undo manager tracks, so an untagged write would be an
+   * edit the user cannot take back.
+   */
+
   const patch = useCallback(
     (p: Partial<ReportData>) => {
       if (!doc) return;
@@ -121,7 +136,7 @@ export function useCollabReport(id: string): CollabReport {
             root.set(key, value);
           }
         }
-      });
+      }, LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -132,7 +147,7 @@ export function useCollabReport(id: string): CollabReport {
       const m = analyticsMap(doc);
       doc.transact(() => {
         for (const [key, value] of Object.entries(p)) m.set(key, value);
-      });
+      }, LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -148,7 +163,7 @@ export function useCollabReport(id: string): CollabReport {
           if (key === "custom") continue;
           m.set(key, value);
         }
-      });
+      }, LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -159,7 +174,7 @@ export function useCollabReport(id: string): CollabReport {
       const m = referrersMap(doc);
       doc.transact(() => {
         for (const [key, value] of Object.entries(p)) m.set(key, value);
-      });
+      }, LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -174,7 +189,7 @@ export function useCollabReport(id: string): CollabReport {
             String(value ?? ""),
           );
         }
-      });
+      }, LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -190,7 +205,10 @@ export function useCollabReport(id: string): CollabReport {
       });
       // Goes through createBlockMap like any other block, so the template's text
       // lands in Y.Text and is immediately co-editable.
-      arr.push([createBlockMap(block, nextOrder(arr))]);
+      doc.transact(
+        () => arr.push([createBlockMap(block, nextOrder(arr))]),
+        LOCAL_ORIGIN,
+      );
     },
     [doc],
   );
@@ -208,7 +226,7 @@ export function useCollabReport(id: string): CollabReport {
             m.set(key, value);
           }
         }
-      });
+      }, LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -218,7 +236,7 @@ export function useCollabReport(id: string): CollabReport {
       if (!doc) return;
       const arr = blocksArray(doc, kind);
       const index = arr.toArray().findIndex((m) => m.get("id") === id);
-      if (index >= 0) arr.delete(index, 1);
+      if (index >= 0) doc.transact(() => arr.delete(index, 1), LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -226,14 +244,20 @@ export function useCollabReport(id: string): CollabReport {
   const reorderBlock = useCallback(
     (kind: BlockKind, from: number, to: number) => {
       if (!doc) return;
-      moveBlock(blocksArray(doc, kind), from, to);
+      doc.transact(
+        () => moveBlock(blocksArray(doc, kind), from, to),
+        LOCAL_ORIGIN,
+      );
     },
     [doc],
   );
 
   const addCustomSocial = useCallback(() => {
     if (!doc) return;
-    customSocials(doc).push([createCustomSocial(uid())]);
+    doc.transact(
+      () => customSocials(doc).push([createCustomSocial(uid())]),
+      LOCAL_ORIGIN,
+    );
   }, [doc]);
 
   const updateCustomSocial = useCallback(
@@ -244,7 +268,7 @@ export function useCollabReport(id: string): CollabReport {
       if (!m) return;
       doc.transact(() => {
         for (const [key, value] of Object.entries(p)) m.set(key, value);
-      });
+      }, LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -254,7 +278,7 @@ export function useCollabReport(id: string): CollabReport {
       if (!doc) return;
       const arr = customSocials(doc);
       const index = arr.toArray().findIndex((c) => c.get("id") === id);
-      if (index >= 0) arr.delete(index, 1);
+      if (index >= 0) doc.transact(() => arr.delete(index, 1), LOCAL_ORIGIN);
     },
     [doc],
   );
@@ -266,6 +290,37 @@ export function useCollabReport(id: string): CollabReport {
     },
     [doc],
   );
+
+  /* ------------------------------------------------------------ undo/redo */
+
+  const undoRef = useRef<Y.UndoManager | null>(null);
+  const [history, setHistory] = useState({ canUndo: false, canRedo: false });
+
+  useEffect(() => {
+    if (!doc) return;
+
+    const manager = createUndoManager(doc);
+    undoRef.current = manager;
+
+    // The stacks are plain arrays on the manager, so React has to be told when
+    // they change — otherwise the buttons never enable.
+    const sync = () =>
+      setHistory({ canUndo: manager.canUndo(), canRedo: manager.canRedo() });
+    manager.on("stack-item-added", sync);
+    manager.on("stack-item-popped", sync);
+    manager.on("stack-cleared", sync);
+    sync();
+
+    return () => {
+      undoRef.current = null;
+      manager.destroy();
+      setHistory({ canUndo: false, canRedo: false });
+    };
+  }, [doc]);
+
+  // Stable identities: the editor binds keyboard shortcuts to these.
+  const undo = useCallback(() => undoRef.current?.undo(), []);
+  const redo = useCallback(() => undoRef.current?.redo(), []);
 
   return {
     status,
@@ -284,5 +339,9 @@ export function useCollabReport(id: string): CollabReport {
     updateCustomSocial,
     removeCustomSocial,
     resetAll,
+    undo,
+    redo,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
   };
 }

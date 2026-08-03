@@ -87,11 +87,20 @@ across browsers and devices instead of living in one browser's `localStorage`.
   builders, editable narrative copy, and the action plan. A sticky "Live
   Analytics" panel shows the auto-calculated ratios. Everything autosaves to
   Supabase (debounced, with a save indicator in the top bar).
-- **Team panel** (`components/TeamPanel.tsx`) — the sidebar in the reports
-  library: everyone signed up to the app, split into who is online right now and
+- **Team drawer** (`components/TeamDrawer.tsx`, `components/TeamPanel.tsx`) —
+  behind the hamburger in the top-left corner, on both the library and the
+  editor: everyone signed up to the app, split into who is online right now and
   who isn't, updating live. Online comes from the Realtime presence channel
   (`lib/presence.ts`) — which also says which report each person has open — and
-  the roster of everybody else from `public.profiles` (`lib/team.ts`).
+  the roster of everybody else from `public.profiles` (`lib/team.ts`). The
+  hamburger carries a green count of teammates online while it is closed, and
+  the roster is only fetched once the drawer is first opened.
+- **Undo / redo** (`lib/collab/doc.ts` → `createUndoManager`) — in the editor's
+  top bar and on **⌘Z / ⌘⇧Z** (Mac) or **Ctrl+Z / Ctrl+⇧Z / Ctrl+Y** (Windows,
+  Linux), including inside text fields, where the browser's own undo would fight
+  the shared document. A `Y.UndoManager` over the report, tracking only this
+  browser's own edits — undo can never take back a colleague's typing. Deleting
+  a block is one step, and undoing it restores the block with its text.
 - **Auto-maths** (`lib/calc.ts`) — Conversion, AOV (gross ÷ orders),
   Add-to-Cart → Purchase %, fulfillment rate and device split are computed for
   you. Manual entries always win over the computed value.
@@ -104,6 +113,13 @@ across browsers and devices instead of living in one browser's `localStorage`.
   page load.
 - **Icons** (`lib/icons.ts`) — one shared definition set drives both the
   dashboard picker and the PDF, so a block's icon always matches.
+- **Dev test data** (`lib/dev-seed.ts`) — click the AskMario logo in the library
+  header **10 times** (without pausing — a ~1s gap resets the streak) and the
+  library fills with 200 throwaway reports, named `[DEV TEST] …` and spread
+  across every health band and a few months of dates. Ten more clicks delete
+  every one of them. For eyeballing pagination, sorting, search and the score
+  chips at volume. It writes to whatever Supabase project the app is pointed at,
+  production included — the prefix is what makes the cleanup exact.
 
 ## PDF structure
 

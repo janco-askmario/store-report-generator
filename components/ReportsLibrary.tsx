@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Copy,
   CloudUpload,
+  ExternalLink,
   FileText,
   FilePlus2,
   Loader2,
@@ -38,9 +39,10 @@ import {
   seedDevReports,
 } from "@/lib/dev-seed";
 import { computeHealth } from "@/lib/scoring";
+import { storeHref } from "@/lib/url";
 import { type PresentUser, usePresence } from "@/lib/presence";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
-import { TeamPanel } from "@/components/TeamPanel";
+import { TeamDrawer } from "@/components/TeamDrawer";
 import { cx } from "@/components/ui";
 
 function fmtDate(ts: number): string {
@@ -325,6 +327,7 @@ export function ReportsLibrary() {
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
+            <TeamDrawer presence={presence} reportNames={reportNames} />
             {/* Sized by height, width auto — a 2.8:1 wordmark in a fixed square
                 would squash it. The divider keeps it from reading as one phrase
                 with the page title. The button around it is the dev-test-data
@@ -345,8 +348,10 @@ export function ReportsLibrary() {
                 className="h-8 w-auto"
               />
             </button>
-            <span aria-hidden className="h-6 w-px bg-black/10" />
-            <div className="leading-tight">
+            {/* The hamburger costs the row 40px, which a phone cannot spare
+                alongside the wordmark — the page title gives way first. */}
+            <span aria-hidden className="hidden h-6 w-px bg-black/10 sm:block" />
+            <div className="hidden leading-tight sm:block">
               <span className="text-[19px] font-semibold tracking-tight text-ink">
                 Store Reports
               </span>
@@ -371,10 +376,10 @@ export function ReportsLibrary() {
         </div>
       </header>
 
-      {/* Reports on the left, the team panel alongside on wide screens and
-          below the grid on narrow ones. */}
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row lg:items-start">
-        <main className="min-w-0 flex-1">
+      {/* The full width belongs to the reports — the team roster lives in the
+          drawer behind the hamburger above. */}
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <main className="min-w-0">
           {legacyCount > 0 && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-3">
               <div className="flex items-start gap-3">
@@ -480,9 +485,9 @@ export function ReportsLibrary() {
                 </div>
               ) : (
                 <>
-                  {/* Only three across once the viewport can afford it beside
-                      the team panel — at lg the cards would be ~220px wide. */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {/* Four across on a wide screen now that nothing sits beside
+                      the grid; below sm a card is a full-width row. */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                     {pageItems.map((r) => (
                       <ReportCard
                         key={r.id}
@@ -529,11 +534,6 @@ export function ReportsLibrary() {
             </>
           )}
         </main>
-
-        {/* Sticky so it stays in view while the library scrolls. */}
-        <aside className="w-full shrink-0 lg:sticky lg:top-[76px] lg:w-72">
-          <TeamPanel presence={presence} reportNames={reportNames} />
-        </aside>
       </div>
 
       {devStatus && (
@@ -566,10 +566,24 @@ function ReportCard({
 }) {
   const { data } = report;
   const health = computeHealth(data);
+  const href = storeHref(data.storeUrl);
+  const name = data.storeName || "Untitled report";
+  /*
+   * The whole card body opens the report, but the store URL inside it has to be
+   * a link to the store — and an <a> cannot live inside a <button>. So the
+   * "open" control is a button stretched behind the content instead of wrapped
+   * around it, the content ignores pointer events, and the pieces that are
+   * themselves interactive opt back in.
+   */
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm transition hover:shadow-md">
-      <button onClick={onOpen} className="flex flex-1 flex-col p-4 text-left">
-        <div className="flex items-start gap-3">
+      <div className="relative flex flex-1 flex-col p-4">
+        <button
+          onClick={onOpen}
+          aria-label={`Open ${name}`}
+          className="absolute inset-0 rounded-t-2xl outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+        />
+        <div className="pointer-events-none relative flex items-start gap-3">
           <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-black/5 bg-black/[0.02]">
             {data.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -579,19 +593,31 @@ function ReportCard({
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[15px] font-semibold text-ink">
-              {data.storeName || "Untitled report"}
-            </div>
-            <div className="truncate text-[12px] text-ink-soft">
-              {data.storeUrl || "No URL yet"}
-            </div>
+            <div className="truncate text-[15px] font-semibold text-ink">{name}</div>
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open ${data.storeUrl} in a new tab`}
+                className="pointer-events-auto inline-flex max-w-full items-center gap-1 text-[12px] text-ink-soft underline-offset-2 transition hover:text-brand-600 hover:underline"
+              >
+                {/* min-w-0 so the URL truncates instead of stretching the card */}
+                <span className="min-w-0 truncate">{data.storeUrl}</span>
+                <ExternalLink size={11} className="shrink-0 opacity-70" />
+              </a>
+            ) : (
+              <div className="truncate text-[12px] text-ink-soft">
+                {data.storeUrl || "No URL yet"}
+              </div>
+            )}
             <div className="mt-1 text-[11px] text-ink-soft">
               Updated {fmtDate(report.updatedAt)}
             </div>
           </div>
-          {/* score chip */}
+          {/* score chip — pointer events back on so its tooltip still appears */}
           <div
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[13px] font-bold"
+            className="pointer-events-auto grid h-11 w-11 shrink-0 place-items-center rounded-full text-[13px] font-bold"
             style={{
               color: health.color,
               backgroundColor: `${health.color}18`,
@@ -605,14 +631,14 @@ function ReportCard({
 
         {viewers.length > 0 && (
           <div
-            className="mt-3 flex items-center gap-1.5"
+            className="pointer-events-auto relative mt-3 flex w-fit items-center gap-1.5"
             title={`In this report now:\n${viewers.map((v) => v.email).join("\n")}`}
           >
             <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-leaf-500" />
             <PresenceAvatars users={viewers} size={20} max={3} />
           </div>
         )}
-      </button>
+      </div>
 
       <div className="flex items-center gap-1 border-t border-black/5 px-3 py-2">
         <button

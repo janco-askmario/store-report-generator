@@ -40,11 +40,17 @@ export function TeamPanel({
   presence,
   reportNames,
   className,
+  variant = "card",
+  action,
 }: {
   presence: Presence;
   /** Report id → store name, for showing what an online teammate is editing. */
   reportNames: Map<string, string>;
   className?: string;
+  /** "card" sits in a page's layout; "drawer" fills the height it is given. */
+  variant?: "card" | "drawer";
+  /** Extra header control — the drawer puts its close button here. */
+  action?: ReactNode;
 }) {
   const { members, error } = useTeamRoster();
   const { byEmail, me } = presence;
@@ -56,16 +62,20 @@ export function TeamPanel({
 
   const online = rows.filter((r) => r.online);
   const offline = rows.filter((r) => !r.online);
+  const drawer = variant === "drawer";
 
   return (
     <section
       className={cx(
-        "overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm",
+        "overflow-hidden bg-white",
+        drawer
+          ? "flex flex-col"
+          : "rounded-2xl border border-black/5 shadow-sm",
         className,
       )}
       aria-label="Team"
     >
-      <header className="flex items-center justify-between gap-2 border-b border-black/5 px-4 py-3">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-black/5 px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-50 text-brand-600">
             <Users size={15} />
@@ -74,23 +84,26 @@ export function TeamPanel({
             Team
           </h2>
         </div>
-        {members !== null && (
-          <span
-            className="flex items-center gap-1.5 rounded-full bg-leaf-50 px-2 py-1 text-[11px] font-semibold text-leaf-700"
-            // aria-live so a screen reader hears people arrive and leave without
-            // having to go looking for the list.
-            aria-live="polite"
-          >
+        <div className="flex items-center gap-1">
+          {members !== null && (
             <span
-              aria-hidden
-              className={cx(
-                "h-1.5 w-1.5 rounded-full",
-                online.length > 0 ? "animate-pulse bg-leaf-500" : "bg-black/20",
-              )}
-            />
-            {online.length} of {rows.length} online
-          </span>
-        )}
+              className="flex items-center gap-1.5 rounded-full bg-leaf-50 px-2 py-1 text-[11px] font-semibold text-leaf-700"
+              // aria-live so a screen reader hears people arrive and leave without
+              // having to go looking for the list.
+              aria-live="polite"
+            >
+              <span
+                aria-hidden
+                className={cx(
+                  "h-1.5 w-1.5 rounded-full",
+                  online.length > 0 ? "animate-pulse bg-leaf-500" : "bg-black/20",
+                )}
+              />
+              {online.length} of {rows.length} online
+            </span>
+          )}
+          {action}
+        </div>
       </header>
 
       {members === null ? (
@@ -102,7 +115,12 @@ export function TeamPanel({
           {error ?? "Nobody has signed up yet."}
         </p>
       ) : (
-        <div className="max-h-72 overflow-y-auto px-2 py-2 lg:max-h-[calc(100vh-11rem)]">
+        <div
+          className={cx(
+            "overflow-y-auto px-2 py-2",
+            drawer ? "min-h-0 flex-1" : "max-h-72 lg:max-h-[calc(100vh-11rem)]",
+          )}
+        >
           {/* The list below may be stale (or presence-only) when this shows —
               say so rather than letting it pass for the current roster. */}
           {error && (
