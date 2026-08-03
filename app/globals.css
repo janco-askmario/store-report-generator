@@ -91,6 +91,11 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
+/* 16×16 sprites drawn at 32px and up: keep the pixels, they are the point. */
+.pixel-art {
+  image-rendering: pixelated;
+}
+
 @keyframes pop-in {
   from {
     opacity: 0;

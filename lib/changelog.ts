@@ -19,6 +19,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-03-pixel-avatars",
+    date: "2026-08-03",
+    title: "Pixel portraits for the team",
+    items: [
+      "Everyone with a picture in the team folder now has it as their avatar — in the team drawer, on the report cards, and in the editor header. Anyone without one keeps their coloured initials.",
+      "Teammates who had an account but never appeared in the team list are back: their roster rows were missing or unreadable. See the team-directory repair migration.",
+    ],
+  },
+  {
     id: "2026-08-03-undo-links-team",
     date: "2026-08-03",
     title: "Undo, clickable store links, and a roomier dashboard",

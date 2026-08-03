@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { Loader2, Users } from "lucide-react";
 import type { Presence, PresentUser } from "@/lib/presence";
 import { displayName, useTeamRoster, type TeamMember } from "@/lib/team";
-import { colorFor, initials } from "@/components/PresenceAvatars";
+import { Avatar } from "@/components/Avatar";
 import { cx } from "@/components/ui";
 
 /**
@@ -190,16 +190,7 @@ function Person({
       title={email}
     >
       <span className="relative shrink-0">
-        <span
-          className={cx(
-            "grid h-8 w-8 place-items-center rounded-full text-[11px] font-semibold text-white transition",
-            !online && "opacity-40",
-          )}
-          style={{ backgroundColor: colorFor(email) }}
-          aria-hidden
-        >
-          {initials(email)}
-        </span>
+        <Avatar email={email} size={32} dimmed={!online} />
         <span
           className={cx(
             "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white",

@@ -95,6 +95,13 @@ across browsers and devices instead of living in one browser's `localStorage`.
   the roster of everybody else from `public.profiles` (`lib/team.ts`). The
   hamburger carries a green count of teammates online while it is closed, and
   the roster is only fetched once the drawer is first opened.
+- **Avatars** (`lib/avatars.ts`, `public/avatars/`) — 16×16 pixel portraits,
+  matched to people by the local part of their email (`james@…`, `james.smith@…`
+  and `jamesb@…` all get `james.png`); addresses that don't carry the person's
+  name go in the `BY_ADDRESS` list in that file. Anyone without a picture keeps
+  their coloured initials, so a new teammate needs no artwork to appear. To add
+  one: drop a PNG in `public/avatars/` (lower-case name) and add the name to
+  `NAMES`. Source frames live in `pixilart-frames/`.
 - **What's new** (`components/WhatsNew.tsx`, `lib/changelog.ts`) — the ⓘ in the
   top-right corner of both headers. Hand-written release notes, newest first,
   with an unread dot until the reader has opened the newest entry (remembered in
