@@ -153,6 +153,11 @@ const s = StyleSheet.create({
 
   /* blocks grid */
   grid: { flexDirection: "row", flexWrap: "wrap" },
+  gridRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginBottom: 10,
+  },
 
   blockWrap: { position: "relative", paddingTop: 22, width: "100%" },
   blockBox: {
@@ -177,6 +182,7 @@ const s = StyleSheet.create({
     width: "100%",
     paddingVertical: 6,
     paddingHorizontal: 6,
+    justifyContent: "center",
   },
   blockFillText: {
     fontFamily: "Montserrat",
@@ -391,23 +397,34 @@ function lineCount(text: string, font: number, width: number, cf = 0.55): number
   if (!paras.length) return 0;
   return paras.reduce((n, p) => n + Math.max(1, Math.ceil(p.length / cpl)), 0);
 }
+// Deliberately runs a little wide (0.62 vs the 0.55-ish elsewhere): this drives
+// the shared block height, which must land *above* the tallest block — see
+// uniformBlockHeight.
 function estBlock(b: Block, topPad: number): number {
   const tf = fitTitle(b.title || "X");
   const titleH =
-    Math.max(1, lineCount(b.title || "X", tf, COL_W - 10, 0.58)) * tf * 1.25 + 6;
+    Math.max(1, lineCount(b.title || "X", tf, COL_W - 10, 0.62)) * tf * 1.25 + 6;
   const ff = fitFill(b.paragraph);
   const fillH = b.paragraph
-    ? lineCount(b.paragraph, ff, FILL_W, 0.56) * ff * 1.35 + 12
+    ? lineCount(b.paragraph, ff, FILL_W, 0.62) * ff * 1.35 + 12
     : 0;
   return 22 + topPad + titleH + fillH;
 }
+/**
+ * One height for every block in a section, taken from its wordiest block, so a
+ * grid never looks ragged. react-pdf can't measure text before layout, so the
+ * height is estimated generously — if it lands under the tallest block, that
+ * block's row grows and only that row is out of step (never clipped). Slack is
+ * absorbed by the coloured fill, which stretches to the bottom of the box.
+ */
+function uniformBlockHeight(blocks: Block[], topPad = 26): number {
+  if (!blocks.length) return 0;
+  return Math.ceil(Math.max(...blocks.map((b) => estBlock(b, topPad))) + 4);
+}
 function estGrid(blocks: Block[], topPad: number): number {
-  let h = 0;
-  for (let i = 0; i < blocks.length; i += 3) {
-    const row = blocks.slice(i, i + 3).map((b) => estBlock(b, topPad));
-    h += Math.max(...row, 0) + 10;
-  }
-  return h;
+  if (!blocks.length) return 0;
+  const rows = Math.ceil(blocks.length / 3);
+  return rows * (uniformBlockHeight(blocks, topPad) + 10);
 }
 function estBox(body: string, bodyFont: number, hasSub: boolean): number {
   return (
@@ -548,8 +565,8 @@ function ContentBlock({
   color: string;
 }) {
   return (
-    <View style={s.blockWrap} wrap={false}>
-      <View style={[s.blockBox, { borderColor: color }]}>
+    <View style={[s.blockWrap, { flexGrow: 1 }]} wrap={false}>
+      <View style={[s.blockBox, { borderColor: color, flexGrow: 1 }]}>
         {block.title ? (
           <Text style={[s.blockTitle, { fontSize: fitTitle(block.title) }]}>
             {block.title}
@@ -558,12 +575,18 @@ function ContentBlock({
           <Text style={s.blockTitle}> </Text>
         )}
         {block.paragraph ? (
-          <View style={[s.blockFill, { backgroundColor: color }]}>
+          // flexShrink 0: if the estimate ever falls short the box grows rather
+          // than squeezing (and clipping) the paragraph.
+          <View
+            style={[s.blockFill, { backgroundColor: color, flexGrow: 1, flexShrink: 0 }]}
+          >
             <Text style={[s.blockFillText, { fontSize: fitFill(block.paragraph) }]}>
               {block.paragraph}
             </Text>
           </View>
-        ) : null}
+        ) : (
+          <View style={{ flexGrow: 1 }} />
+        )}
       </View>
       <View style={s.circleOverlay}>
         <View style={[s.circle, { backgroundColor: color }]}>
@@ -575,24 +598,29 @@ function ContentBlock({
 }
 
 function BlockGrid({ blocks, kind }: { blocks: Block[]; kind: "good" | "bad" }) {
+  // One height for the whole section: rows stretch their columns to match each
+  // other, and the shared minHeight lifts every row up to the wordiest block.
+  const rowHeight = uniformBlockHeight(blocks);
+  const rows: Block[][] = [];
+  for (let i = 0; i < blocks.length; i += 3) rows.push(blocks.slice(i, i + 3));
+
   return (
-    <View style={s.grid}>
-      {blocks.map((b, i) => {
-        const color = kind === "good" ? goodColor(b) : badColor(b);
-        const endOfRow = i % 3 === 2;
-        return (
-          <View
-            key={b.id}
-            style={{
-              width: "31.8%",
-              marginRight: endOfRow ? 0 : "2.3%",
-              marginBottom: 10,
-            }}
-          >
-            <ContentBlock block={b} color={color} />
-          </View>
-        );
-      })}
+    <View>
+      {rows.map((row, r) => (
+        <View key={r} style={[s.gridRow, { minHeight: rowHeight }]}>
+          {row.map((b, i) => (
+            <View
+              key={b.id}
+              style={{ width: "31.8%", marginRight: i === 2 ? 0 : "2.3%" }}
+            >
+              <ContentBlock
+                block={b}
+                color={kind === "good" ? goodColor(b) : badColor(b)}
+              />
+            </View>
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
