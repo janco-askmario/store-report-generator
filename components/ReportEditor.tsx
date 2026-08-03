@@ -78,7 +78,7 @@ import { BlockTemplatePicker } from "@/components/BlockTemplatePicker";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
 import { TeamSidebar, TeamSidebarToggle } from "@/components/TeamSidebar";
 import { WhatsNew } from "@/components/WhatsNew";
-import { CollabTextArea, CollabTextAreaField } from "@/components/CollabField";
+import { CollabTextAreaField, RichTextArea } from "@/components/CollabField";
 import {
   Field,
   Label,
@@ -1164,7 +1164,7 @@ export function ReportEditor({ id }: { id: string }) {
               description="The main passage to your client. One action per paragraph — start each with a bold lead-in and a colon."
               icon={<FileText size={18} />}
             >
-              <CollabTextArea
+              <RichTextArea
                 text={proseText(doc, "actionPlan")}
                 rows={12}
                 placeholder={
@@ -1173,7 +1173,8 @@ export function ReportEditor({ id }: { id: string }) {
               />
               <p className="mt-2 text-[12px] text-ink-soft">
                 Tip: separate each action with a blank line. Text before the first
-                “:” becomes a bold lead-in in the PDF.
+                “:” becomes a bold lead-in in the PDF. Select any text and use B /
+                I / U (⌘B, ⌘I, ⌘U) to format it.
               </p>
             </SectionCard>
 

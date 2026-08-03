@@ -35,6 +35,7 @@ import {
   LABELS,
 } from "@/lib/templates";
 import { getIcon } from "@/lib/icons";
+import { bulletize, parseInline, toPlain } from "@/lib/richtext";
 import { PdfIcon } from "./PdfIcon";
 
 // Register fonts at module load (before any render). In the browser this uses
@@ -46,6 +47,14 @@ registerFonts();
 // Width stays A4; each page's HEIGHT is estimated from its content so the page
 // is a tall single canvas that fits exactly (no A4 cutoff, no empty tail).
 const PAGE_WIDTH = 595.28;
+
+/* ------------------------------------------------------------- block chrome */
+/** Outline weight of every content block (good, bad and the page-3 metrics). */
+const BLOCK_BORDER = 6.3;
+/** Star strip under a rated block: glyph height plus the gap above it. */
+const STAR_SIZE = 8;
+const STAR_GAP = 5;
+const STAR_ROW_H = STAR_SIZE + STAR_GAP;
 
 /* --------------------------------------------------------------- palette */
 const C = {
@@ -161,11 +170,17 @@ const s = StyleSheet.create({
 
   blockWrap: { position: "relative", paddingTop: 22, width: "100%" },
   blockBox: {
-    borderWidth: 1.3,
+    borderWidth: BLOCK_BORDER,
     borderRadius: 2,
     paddingTop: 26,
     paddingBottom: 0,
     alignItems: "center",
+  },
+  starRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: STAR_GAP,
   },
   blockTitle: {
     fontFamily: "Montserrat",
@@ -289,7 +304,7 @@ const s = StyleSheet.create({
     fontFamily: "Montserrat",
     fontSize: 8.5,
     color: C.ink,
-    textAlign: "center",
+    textAlign: "left",
     lineHeight: 1.45,
     marginBottom: 7,
   },
@@ -384,7 +399,10 @@ function fitActions(text: string): number {
 // an extra page.
 const CONTENT_W = PAGE_WIDTH - 52;
 const COL_W = CONTENT_W * 0.318;
-const FILL_W = COL_W - 15;
+// Borders sit inside the box, so a heavier outline leaves less room for text.
+const BLOCK_INNER_W = COL_W - BLOCK_BORDER * 2;
+const FILL_W = BLOCK_INNER_W - 12; // blockFill paddingHorizontal
+const TITLE_W = BLOCK_INNER_W - 10; // blockTitle paddingHorizontal
 const BOX_W = CONTENT_W - 32;
 const SECTION_H = 20 + 12; // header line + marginBottom (marginTop added by caller)
 
@@ -397,18 +415,36 @@ function lineCount(text: string, font: number, width: number, cf = 0.55): number
   if (!paras.length) return 0;
   return paras.reduce((n, p) => n + Math.max(1, Math.ceil(p.length / cpl)), 0);
 }
+/** Anything drawn as a bordered block: the good/bad blocks and the metrics. */
+interface BlockLike {
+  title: string;
+  paragraph: string;
+  rating?: number;
+}
+
 // Deliberately runs a little wide (0.62 vs the 0.55-ish elsewhere): this drives
 // the shared block height, which must land *above* the tallest block — see
 // uniformBlockHeight.
-function estBlock(b: Block, topPad: number): number {
+function estBlock(b: BlockLike, topPad: number, reserveStars: boolean): number {
   const tf = fitTitle(b.title || "X");
   const titleH =
-    Math.max(1, lineCount(b.title || "X", tf, COL_W - 10, 0.62)) * tf * 1.25 + 6;
-  const ff = fitFill(b.paragraph);
-  const fillH = b.paragraph
-    ? lineCount(b.paragraph, ff, FILL_W, 0.62) * ff * 1.35 + 12
-    : 0;
-  return 22 + topPad + titleH + fillH;
+    Math.max(1, lineCount(b.title || "X", tf, TITLE_W, 0.62)) * tf * 1.25 + 6;
+  // Markers are formatting, not characters on the page.
+  const plain = toPlain(b.paragraph);
+  const ff = fitFill(plain);
+  const fillH = plain ? lineCount(plain, ff, FILL_W, 0.62) * ff * 1.35 + 12 : 0;
+  const starsH = reserveStars ? STAR_ROW_H : 0;
+  return 22 + BLOCK_BORDER * 2 + topPad + titleH + fillH + starsH;
+}
+
+/**
+ * Whether a section shows the star strip at all. It is all or nothing per
+ * section: reserving the strip for an unrated block keeps every outline the
+ * same height, but reserving it when nobody rated anything would just leave a
+ * gap under every block.
+ */
+function showsStars(blocks: BlockLike[]): boolean {
+  return blocks.some((b) => (b.rating ?? 0) > 0);
 }
 /**
  * One height for every block in a section, taken from its wordiest block, so a
@@ -417,11 +453,24 @@ function estBlock(b: Block, topPad: number): number {
  * block's row grows and only that row is out of step (never clipped). Slack is
  * absorbed by the coloured fill, which stretches to the bottom of the box.
  */
-function uniformBlockHeight(blocks: Block[], topPad = 26): number {
+function uniformBlockHeight(blocks: BlockLike[], topPad = 26): number {
   if (!blocks.length) return 0;
-  return Math.ceil(Math.max(...blocks.map((b) => estBlock(b, topPad))) + 4);
+  const stars = showsStars(blocks);
+  return Math.ceil(Math.max(...blocks.map((b) => estBlock(b, topPad, stars))) + 4);
 }
-function estGrid(blocks: Block[], topPad: number): number {
+/** The metric circle is bigger than a block icon, so it needs more head room. */
+const METRIC_TOP_PAD = 46;
+
+/** The three page-3 metrics measured as blocks, so they can share a height. */
+function metricBlockLikes(data: ReportData): BlockLike[] {
+  return [
+    { title: LABELS.conversionRate, paragraph: data.page3.conversionNote },
+    { title: LABELS.averageOrderValue, paragraph: data.page3.aovNote },
+    { title: LABELS.addToCart, paragraph: data.page3.addToCartNote },
+  ];
+}
+
+function estGrid(blocks: BlockLike[], topPad: number): number {
   if (!blocks.length) return 0;
   const rows = Math.ceil(blocks.length / 3);
   return rows * (uniformBlockHeight(blocks, topPad) + 10);
@@ -467,33 +516,9 @@ function estimateHeights(data: ReportData): [number, number, number] {
 
   // ---- Page 3
   const actions = parseActionItems(data.actionPlan);
-  const asz = fitActions(data.actionPlan);
-  const metricNotes = [
-    data.page3.conversionNote,
-    data.page3.aovNote,
-    data.page3.addToCartNote,
-  ];
-  const metricLabels = [
-    LABELS.conversionRate,
-    LABELS.averageOrderValue,
-    LABELS.addToCart,
-  ];
+  const asz = fitActions(toPlain(data.actionPlan));
   const metricRow =
-    Math.max(
-      ...metricNotes.map((note, i) => {
-        const tf = fitTitle(metricLabels[i]);
-        const titleH =
-          Math.max(1, lineCount(metricLabels[i], tf, COL_W - 10, 0.58)) *
-            tf *
-            1.25 +
-          6;
-        const ff = fitFill(note);
-        const fillH = note
-          ? lineCount(note, ff, FILL_W, 0.56) * ff * 1.35 + 12
-          : 0;
-        return 22 + 46 + titleH + fillH;
-      }),
-    ) + 10;
+    uniformBlockHeight(metricBlockLikes(data), METRIC_TOP_PAD) + 10;
   let h3 = 26 + SECTION_H + metricRow;
   h3 += 16 + SECTION_H; // ACTION PLAN SUMMARY
   h3 += 10.5 * 1.25 + 2; // tagline
@@ -502,7 +527,12 @@ function estimateHeights(data: ReportData): [number, number, number] {
       n +
       Math.max(
         1,
-        lineCount(`${a.title ? `${a.title}: ` : ""}${a.body}`, asz, BOX_W, 0.55),
+        lineCount(
+          `${a.title ? `${a.title}: ` : ""}${toPlain(a.body)}`,
+          asz,
+          BOX_W,
+          0.55,
+        ),
       ) *
         asz *
         1.45 +
@@ -516,6 +546,58 @@ function estimateHeights(data: ReportData): [number, number, number] {
   // Proportional safety so estimation error never overflows onto an extra page.
   const clamp = (h: number) => Math.round(Math.max(420, h * 1.08 + 48));
   return [clamp(h1), clamp(h2), clamp(h3)];
+}
+
+/* ------------------------------------------------------------- rich text */
+/**
+ * Renders `**bold**`, `*italic*` and `__underline__` as real styled runs.
+ *
+ * Italic runs pin their own weight rather than inheriting it: only 400 and 700
+ * italics are registered, and asking react-pdf for an italic at the 500 the
+ * block fill uses would fail to resolve.
+ */
+function RichRuns({ text }: { text: string }) {
+  return (
+    <>
+      {parseInline(bulletize(text)).map((run, i) => (
+        <Text
+          key={i}
+          style={{
+            ...(run.bold ? { fontWeight: 700 } : {}),
+            ...(run.italic
+              ? { fontStyle: "italic" as const, fontWeight: run.bold ? 700 : 400 }
+              : {}),
+            ...(run.underline ? { textDecoration: "underline" as const } : {}),
+          }}
+        >
+          {run.text}
+        </Text>
+      ))}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------ star rating */
+// Same glyph as the editor's StarRating, so a 4-star block looks the same in
+// both places.
+const STAR_D =
+  "M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.563.563 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z";
+
+function StarRow({ rating, color }: { rating: number; color: string }) {
+  // An unrated block in a rated section keeps the space, so the outlines below
+  // it still line up with its neighbours'.
+  if (!rating) return <View style={[s.starRow, { height: STAR_SIZE }]} />;
+  return (
+    <View style={s.starRow}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <View key={i} style={{ marginHorizontal: 0.7 }}>
+          <Svg width={STAR_SIZE} height={STAR_SIZE} viewBox="0 0 24 24">
+            <Path d={STAR_D} fill={i < rating ? color : C.muted} />
+          </Svg>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 /* -------------------------------------------------------------- helpers */
@@ -550,7 +632,11 @@ function parseActionItems(text: string) {
   }
   return chunks.map((chunk) => {
     const idx = chunk.indexOf(":");
-    if (idx > 0 && idx <= 64) {
+    // The lead-in is only split out when the colon comes before any formatting
+    // marker. Someone who bolds their own lead-in has said what they want, and
+    // splitting mid-marker would strand a "**" in the middle of the sentence.
+    const marker = chunk.search(/\*\*|__|\*/);
+    if (idx > 0 && idx <= 64 && (marker === -1 || idx < marker)) {
       return { title: chunk.slice(0, idx).trim(), body: chunk.slice(idx + 1).trim() };
     }
     return { body: chunk };
@@ -560,9 +646,11 @@ function parseActionItems(text: string) {
 function ContentBlock({
   block,
   color,
+  showStars,
 }: {
   block: Block;
   color: string;
+  showStars: boolean;
 }) {
   return (
     <View style={[s.blockWrap, { flexGrow: 1 }]} wrap={false}>
@@ -580,14 +668,21 @@ function ContentBlock({
           <View
             style={[s.blockFill, { backgroundColor: color, flexGrow: 1, flexShrink: 0 }]}
           >
-            <Text style={[s.blockFillText, { fontSize: fitFill(block.paragraph) }]}>
-              {block.paragraph}
+            <Text
+              style={[
+                s.blockFillText,
+                { fontSize: fitFill(toPlain(block.paragraph)) },
+              ]}
+            >
+              <RichRuns text={block.paragraph} />
             </Text>
           </View>
         ) : (
           <View style={{ flexGrow: 1 }} />
         )}
       </View>
+      {/* The rating the block was given in the editor, under its own block. */}
+      {showStars ? <StarRow rating={block.rating} color={color} /> : null}
       <View style={s.circleOverlay}>
         <View style={[s.circle, { backgroundColor: color }]}>
           <PdfIcon name={block.icon} size={21} color={C.ink} strokeWidth={1.8} />
@@ -601,6 +696,7 @@ function BlockGrid({ blocks, kind }: { blocks: Block[]; kind: "good" | "bad" }) 
   // One height for the whole section: rows stretch their columns to match each
   // other, and the shared minHeight lifts every row up to the wordiest block.
   const rowHeight = uniformBlockHeight(blocks);
+  const stars = showsStars(blocks);
   const rows: Block[][] = [];
   for (let i = 0; i < blocks.length; i += 3) rows.push(blocks.slice(i, i + 3));
 
@@ -616,6 +712,7 @@ function BlockGrid({ blocks, kind }: { blocks: Block[]; kind: "good" | "bad" }) 
               <ContentBlock
                 block={b}
                 color={kind === "good" ? goodColor(b) : badColor(b)}
+                showStars={stars}
               />
             </View>
           ))}
@@ -637,16 +734,22 @@ function MetricBlock({
   color: string;
 }) {
   return (
-    <View style={s.blockWrap} wrap={false}>
-      <View style={[s.blockBox, { borderColor: color, paddingTop: 46 }]}>
+    <View style={[s.blockWrap, { flexGrow: 1 }]} wrap={false}>
+      <View
+        style={[s.blockBox, { borderColor: color, paddingTop: 46, flexGrow: 1 }]}
+      >
         <Text style={[s.blockTitle, { fontSize: fitTitle(label) }]}>{label}</Text>
         {note ? (
-          <View style={[s.blockFill, { backgroundColor: color }]}>
+          <View
+            style={[s.blockFill, { backgroundColor: color, flexGrow: 1, flexShrink: 0 }]}
+          >
             <Text style={[s.blockFillText, { fontSize: fitFill(note) }]}>
               {note}
             </Text>
           </View>
-        ) : null}
+        ) : (
+          <View style={{ flexGrow: 1 }} />
+        )}
       </View>
       <View style={s.circleOverlay}>
         <View style={[s.metricCircle, { backgroundColor: color }]}>
@@ -677,8 +780,9 @@ export function ReportDocument({ data }: { data: ReportData }) {
   const good = data.goodBlocks.filter((b) => b.title.trim() || b.paragraph.trim());
   const bad = data.badBlocks.filter((b) => b.title.trim() || b.paragraph.trim());
   const actions = parseActionItems(data.actionPlan);
-  const actionSize = fitActions(data.actionPlan);
+  const actionSize = fitActions(toPlain(data.actionPlan));
   const bulb = getIcon("bulb");
+  const metricHeight = uniformBlockHeight(metricBlockLikes(data), METRIC_TOP_PAD);
   const [pageH1, pageH2, pageH3] = estimateHeights(data);
 
   return (
@@ -790,7 +894,8 @@ export function ReportDocument({ data }: { data: ReportData }) {
           <Text style={[s.sectionHeader, { marginTop: 0 }]}>
             Key Metrics To Remember
           </Text>
-          <View style={s.grid}>
+          {/* Same stretch-to-the-wordiest treatment as the block grids. */}
+          <View style={[s.gridRow, { minHeight: metricHeight }]}>
             {[
               {
                 value: conv != null ? formatPct(conv, conv < 1 ? 1 : 2) : "—",
@@ -843,7 +948,9 @@ export function ReportDocument({ data }: { data: ReportData }) {
                 {a.title ? (
                   <Text style={s.actionLead}>{a.title}: </Text>
                 ) : null}
-                <Text style={s.actionBody}>{a.body}</Text>
+                <Text style={s.actionBody}>
+                  <RichRuns text={a.body} />
+                </Text>
               </Text>
             ))}
           </View>

@@ -4,7 +4,7 @@ import type { HTMLAttributes } from "react";
 import { BookmarkPlus, Check, GripVertical, Trash2 } from "lucide-react";
 import type * as Y from "yjs";
 import type { Block } from "@/lib/types";
-import { CollabInput, CollabTextArea } from "./CollabField";
+import { CollabInput, RichTextArea } from "./CollabField";
 import { IconPicker } from "./IconPicker";
 import { StarRating } from "./StarRating";
 import { cx } from "./ui";
@@ -99,7 +99,7 @@ export function BlockEditor({
             }
             className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[14px] font-semibold text-ink outline-none transition placeholder:font-normal placeholder:text-ink-soft/50 focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
           />
-          <CollabTextArea
+          <RichTextArea
             text={paragraphText}
             rows={3}
             placeholder="Short paragraph explaining it to the client…"

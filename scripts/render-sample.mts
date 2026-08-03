@@ -10,16 +10,9 @@ import { extname } from "node:path";
 import { renderToFile, Font } from "@react-pdf/renderer";
 import React from "react";
 import { createBlock, createInitialData } from "../lib/defaults";
-import { FONT_FILES, setFontOverrides } from "../lib/pdf-fonts";
+import { FONT_DESCRIPTORS, FONT_FILES, setFontOverrides } from "../lib/pdf-fonts";
 
 // Node can't fetch the browser `/fonts/*` URLs — inline the TTFs as data URIs.
-const WEIGHTS: Record<string, number> = {
-  "Montserrat-Regular.ttf": 400,
-  "Montserrat-Medium.ttf": 500,
-  "Montserrat-SemiBold.ttf": 600,
-  "Montserrat-Bold.ttf": 700,
-  "Montserrat-ExtraBold.ttf": 800,
-};
 const fontMap = Object.fromEntries(
   FONT_FILES.map((f) => [
     f,
@@ -31,8 +24,15 @@ setFontOverrides(fontMap);
 // instance that renderToFile uses.
 Font.register({
   family: "Montserrat",
-  fonts: FONT_FILES.map((f) => ({ src: fontMap[f], fontWeight: WEIGHTS[f] })),
+  fonts: FONT_DESCRIPTORS.map((f) => ({
+    src: fontMap[f.file],
+    fontWeight: f.weight,
+    ...(f.style ? { fontStyle: f.style } : {}),
+  })),
 });
+// The browser gets this from registerFonts(); without it here the sample would
+// hyphenate words the real PDF never breaks, and the preview would lie.
+Font.registerHyphenationCallback((word) => [word]);
 
 const { ReportDocument } = await import("../components/pdf/ReportDocument");
 
