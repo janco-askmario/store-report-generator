@@ -43,6 +43,7 @@ import { storeHref } from "@/lib/url";
 import { type PresentUser, usePresence } from "@/lib/presence";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
 import { TeamDrawer } from "@/components/TeamDrawer";
+import { WhatsNew } from "@/components/WhatsNew";
 import { cx } from "@/components/ui";
 
 function fmtDate(ts: number): string {
@@ -325,7 +326,9 @@ export function ReportsLibrary() {
     <div className="app-bg min-h-screen">
       {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        {/* Full-bleed: the hamburger belongs in the corner of the screen, not
+            in the corner of a centred column. */}
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <TeamDrawer presence={presence} reportNames={reportNames} />
             {/* Sized by height, width auto — a 2.8:1 wordmark in a fixed square
@@ -358,12 +361,18 @@ export function ReportsLibrary() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Icon-only on a phone — the hamburger and the ⓘ took the width the
+                label used to have, and the grid below ends in a New report tile
+                anyway. */}
             <button
               onClick={onNew}
-              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2.5 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110"
+              title="New report"
+              className="flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 sm:px-4"
             >
-              <FilePlus2 size={16} /> New report
+              <FilePlus2 size={16} />
+              <span className="hidden sm:inline">New report</span>
             </button>
+            <WhatsNew />
             <button
               onClick={onSignOut}
               title={email ? `Sign out of ${email}` : "Sign out"}
@@ -378,7 +387,7 @@ export function ReportsLibrary() {
 
       {/* The full width belongs to the reports — the team roster lives in the
           drawer behind the hamburger above. */}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <div className="w-full px-4 py-8 sm:px-6 lg:px-8">
         <main className="min-w-0">
           {legacyCount > 0 && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-3">
@@ -485,9 +494,10 @@ export function ReportsLibrary() {
                 </div>
               ) : (
                 <>
-                  {/* Four across on a wide screen now that nothing sits beside
-                      the grid; below sm a card is a full-width row. */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                  {/* The grid owns the whole viewport now, so it keeps adding
+                      columns rather than stretching cards; below sm a card is a
+                      full-width row. */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {pageItems.map((r) => (
                       <ReportCard
                         key={r.id}

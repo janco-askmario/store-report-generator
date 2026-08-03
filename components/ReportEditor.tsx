@@ -77,6 +77,7 @@ import { BlockEditor } from "@/components/BlockEditor";
 import { BlockTemplatePicker } from "@/components/BlockTemplatePicker";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
 import { TeamDrawer } from "@/components/TeamDrawer";
+import { WhatsNew } from "@/components/WhatsNew";
 import { CollabTextArea, CollabTextAreaField } from "@/components/CollabField";
 import {
   Field,
@@ -595,7 +596,8 @@ export function ReportEditor({ id }: { id: string }) {
     <div className="app-bg min-h-screen pb-24">
       {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        {/* Full-bleed, same as the library's header. */}
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Same control, same corner, as on the dashboard. */}
             <TeamDrawer presence={presence} reportNames={reportNames} />
@@ -616,12 +618,15 @@ export function ReportEditor({ id }: { id: string }) {
                   AskMario
                 </span>
               </div>
-              <span className="flex items-center gap-2 text-[12px] text-ink-soft">
-                <span className="flex items-center gap-1">
+              {/* One line, always: on a phone the save state wraps to three and
+                  makes the header taller than the page it sits on, so only the
+                  completion figure survives that far down. */}
+              <span className="flex items-center gap-2 overflow-hidden whitespace-nowrap text-[12px] text-ink-soft">
+                <span className="hidden items-center gap-1 sm:flex">
                   <Cloud size={12} />
                   {others.length > 0 ? "Shared — live" : "Saves as you type"}
                 </span>
-                <span className="text-black/20">·</span>
+                <span className="hidden text-black/20 sm:inline">·</span>
                 <span className="font-semibold text-brand-600">
                   {completion.percent}% complete
                 </span>
@@ -665,35 +670,38 @@ export function ReportEditor({ id }: { id: string }) {
             >
               <Eraser size={15} /> Clear
             </button>
-            {/* Labels drop away on a phone: the hamburger and the undo pair took
-                the room they used to have, and both actions are repeated in full
-                at the bottom of the form on anything narrower than xl. */}
+            {/* The PDF pair gives way as the header narrows — icon-only below
+                md, gone below sm — because both are repeated in full at the
+                bottom of the form on anything narrower than xl, while undo and
+                the drawer exist nowhere else. */}
             <button
               onClick={handlePreview}
               disabled={genDisabled}
               title="Preview the PDF"
-              className="flex h-10 items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 text-[13px] font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60 sm:px-3.5"
+              className="hidden h-10 items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 text-[13px] font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60 sm:flex md:px-3.5"
             >
               {busy === "preview" ? (
                 <Loader2 size={15} className="animate-spin" />
               ) : (
                 <Eye size={15} />
               )}
-              <span className="hidden sm:inline">Preview</span>
+              <span className="hidden md:inline">Preview</span>
             </button>
             <button
               onClick={handleDownload}
               disabled={genDisabled}
               title="Generate the PDF"
-              className="flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 disabled:opacity-60 sm:px-4"
+              className="hidden h-10 items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 disabled:opacity-60 sm:flex md:px-4"
             >
               {busy === "download" ? (
                 <Loader2 size={15} className="animate-spin" />
               ) : (
                 <Download size={15} />
               )}
-              <span className="hidden sm:inline">Generate PDF</span>
+              <span className="hidden md:inline">Generate PDF</span>
             </button>
+            {/* Same corner, same control, as on the dashboard. */}
+            <WhatsNew />
           </div>
         </div>
         {/* completion progress bar */}
@@ -708,7 +716,7 @@ export function ReportEditor({ id }: { id: string }) {
       {/* Who else is in here. Informational, not a warning: edits merge, so the
           only thing worth saying is that changes will appear as they happen. */}
       {others.length > 0 && (
-        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <div className="w-full px-4 pt-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-2.5">
             <Users size={16} className="shrink-0 text-brand-600" />
             <PresenceAvatars users={others} size={24} />
@@ -725,7 +733,9 @@ export function ReportEditor({ id }: { id: string }) {
       )}
 
       {/* Body */}
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[1fr_320px]">
+      {/* minmax(0,…) rather than 1fr: a grid track sized by content would let a
+          long store name or a wide field push the sidebar off screen. */}
+      <main className="grid w-full grid-cols-1 gap-5 px-4 py-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
           {/* Store basics */}
           <SectionCard
@@ -837,7 +847,9 @@ export function ReportEditor({ id }: { id: string }) {
             description="Enter what Shopify reports — ratios and verdicts are calculated for you."
             icon={<BarChart3 size={18} />}
           >
-            <div className="grid gap-4 sm:grid-cols-2">
+            {/* Ten fields: more columns as the screen allows, rather than ten
+                very wide rows. */}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               <Field
                 label="Conversion rate"
                 hint="blank = auto-calc"

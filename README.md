@@ -95,6 +95,10 @@ across browsers and devices instead of living in one browser's `localStorage`.
   the roster of everybody else from `public.profiles` (`lib/team.ts`). The
   hamburger carries a green count of teammates online while it is closed, and
   the roster is only fetched once the drawer is first opened.
+- **What's new** (`components/WhatsNew.tsx`, `lib/changelog.ts`) — the ⓘ in the
+  top-right corner of both headers. Hand-written release notes, newest first,
+  with an unread dot until the reader has opened the newest entry (remembered in
+  `localStorage`). Add an entry with a fresh `id` to bring the dot back.
 - **Undo / redo** (`lib/collab/doc.ts` → `createUndoManager`) — in the editor's
   top bar and on **⌘Z / ⌘⇧Z** (Mac) or **Ctrl+Z / Ctrl+⇧Z / Ctrl+Y** (Windows,
   Linux), including inside text fields, where the browser's own undo would fight
