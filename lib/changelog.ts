@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-04-team-panel-push",
+    date: "2026-08-04",
+    title: "The team panel is part of the page now",
+    items: [
+      "It slides open down the left edge and the app moves over to make room, instead of floating on top of everything. Reports re-wrap into the space that is left, so you can watch the team and keep working.",
+      "It stays open until you close it, and remembers which you chose on this computer. New here? It starts open.",
+      "On a phone or a narrow window it still slides over the page, since pushing would leave nothing to read.",
+    ],
+  },
+  {
     id: "2026-08-03-pixel-avatars",
     date: "2026-08-03",
     title: "Pixel portraits for the team",

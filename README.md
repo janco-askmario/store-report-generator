@@ -87,14 +87,24 @@ across browsers and devices instead of living in one browser's `localStorage`.
   builders, editable narrative copy, and the action plan. A sticky "Live
   Analytics" panel shows the auto-calculated ratios. Everything autosaves to
   Supabase (debounced, with a save indicator in the top bar).
-- **Team drawer** (`components/TeamDrawer.tsx`, `components/TeamPanel.tsx`) —
+- **Team panel** (`components/TeamSidebar.tsx`, `components/TeamPanel.tsx`) —
   behind the hamburger in the top-left corner, on both the library and the
   editor: everyone signed up to the app, split into who is online right now and
   who isn't, updating live. Online comes from the Realtime presence channel
   (`lib/presence.ts`) — which also says which report each person has open — and
   the roster of everybody else from `public.profiles` (`lib/team.ts`). The
   hamburger carries a green count of teammates online while it is closed, and
-  the roster is only fetched once the drawer is first opened.
+  the roster is only fetched once the panel is first opened.
+
+  `TeamSidebar` wraps the whole page, header included, because the open panel is
+  a column of the layout rather than a sheet over it: the content column shrinks
+  and the report grid (`repeat(auto-fill, …)`, not per-breakpoint columns)
+  re-wraps to fit. Below `lg` it reverts to an overlay with a backdrop, since
+  pushing 288px on a phone leaves nothing to read. The open/closed choice is kept
+  in `localStorage` under `team-panel` — only when pushing, so dismissing the
+  overlay on a phone doesn't greet you with a closed panel on a desktop — and it
+  defaults to open. The hamburger and the panel are in different components, so
+  they talk over a context; `TeamSidebarToggle` is the button.
 - **Avatars** (`lib/avatars.ts`, `public/avatars/`) — 16×16 pixel portraits,
   matched to people by the local part of their email (`james@…`, `james.smith@…`
   and `jamesb@…` all get `james.png`); addresses that don't carry the person's

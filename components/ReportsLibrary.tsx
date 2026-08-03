@@ -42,7 +42,7 @@ import { computeHealth } from "@/lib/scoring";
 import { storeHref } from "@/lib/url";
 import { type PresentUser, usePresence } from "@/lib/presence";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
-import { TeamDrawer } from "@/components/TeamDrawer";
+import { TeamSidebar, TeamSidebarToggle } from "@/components/TeamSidebar";
 import { WhatsNew } from "@/components/WhatsNew";
 import { cx } from "@/components/ui";
 
@@ -323,241 +323,246 @@ export function ReportsLibrary() {
   }, [devStatus, devBusy]);
 
   return (
-    <div className="app-bg min-h-screen">
-      {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-xl">
-        {/* Full-bleed: the hamburger belongs in the corner of the screen, not
-            in the corner of a centred column. */}
-        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <TeamDrawer presence={presence} reportNames={reportNames} />
-            {/* Sized by height, width auto — a 2.8:1 wordmark in a fixed square
-                would squash it. The divider keeps it from reading as one phrase
-                with the page title. The button around it is the dev-test-data
-                trigger — see onLogoClick; the image alt is empty because the
-                button already carries the name. */}
-            <button
-              type="button"
-              onClick={onLogoClick}
-              aria-label="AskMario"
-              className="shrink-0 rounded-lg outline-none transition active:scale-95"
-            >
-              <Image
-                src="/AskMario-logo.png"
-                alt=""
-                width={1400}
-                height={500}
-                priority
-                className="h-8 w-auto"
-              />
-            </button>
-            {/* The hamburger costs the row 40px, which a phone cannot spare
-                alongside the wordmark — the page title gives way first. */}
-            <span aria-hidden className="hidden h-6 w-px bg-black/10 sm:block" />
-            <div className="hidden leading-tight sm:block">
-              <span className="text-[19px] font-semibold tracking-tight text-ink">
-                Store Reports
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Icon-only on a phone — the hamburger and the ⓘ took the width the
-                label used to have, and the grid below ends in a New report tile
-                anyway. */}
-            <button
-              onClick={onNew}
-              title="New report"
-              className="flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 sm:px-4"
-            >
-              <FilePlus2 size={16} />
-              <span className="hidden sm:inline">New report</span>
-            </button>
-            <WhatsNew />
-            <button
-              onClick={onSignOut}
-              title={email ? `Sign out of ${email}` : "Sign out"}
-              aria-label="Sign out"
-              className="grid h-10 w-10 place-items-center rounded-xl text-ink-soft transition hover:bg-black/[0.04] hover:text-ink"
-            >
-              <LogOut size={17} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* The full width belongs to the reports — the team roster lives in the
-          drawer behind the hamburger above. */}
-      <div className="w-full px-4 py-8 sm:px-6 lg:px-8">
-        <main className="min-w-0">
-          {legacyCount > 0 && (
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-3">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-brand-600">
-                  <CloudUpload size={16} />
-                </div>
-                <div className="text-[13px] leading-snug text-ink">
-                  <span className="font-semibold">
-                    {legacyCount} report{legacyCount > 1 ? "s" : ""} saved in this browser
-                  </span>
-                  <span className="block text-ink-soft">
-                    From before reports synced to the cloud. Upload to keep
-                    {legacyCount > 1 ? " them" : " it"} on your account.
-                  </span>
-                </div>
-              </div>
+    <TeamSidebar presence={presence} reportNames={reportNames}>
+      <div className="app-bg min-h-screen">
+        {/* Top bar */}
+        <header className="sticky top-0 z-20 border-b border-black/5 bg-white/80 backdrop-blur-xl">
+          {/* Full-bleed: the hamburger belongs in the corner of the screen, not
+              in the corner of a centred column. */}
+          <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-3">
+              <TeamSidebarToggle />
+              {/* Sized by height, width auto — a 2.8:1 wordmark in a fixed square
+                  would squash it. The divider keeps it from reading as one phrase
+                  with the page title. The button around it is the dev-test-data
+                  trigger — see onLogoClick; the image alt is empty because the
+                  button already carries the name. */}
               <button
-                onClick={onImportLegacy}
-                disabled={importing}
-                className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+                type="button"
+                onClick={onLogoClick}
+                aria-label="AskMario"
+                className="shrink-0 rounded-lg outline-none transition active:scale-95"
               >
-                {importing ? (
-                  <>
-                    <Loader2 size={15} className="animate-spin" /> Uploading…
-                  </>
-                ) : (
-                  "Upload to cloud"
-                )}
+                <Image
+                  src="/AskMario-logo.png"
+                  alt=""
+                  width={1400}
+                  height={500}
+                  priority
+                  className="h-8 w-auto"
+                />
+              </button>
+              {/* The hamburger costs the row 40px, which a phone cannot spare
+                  alongside the wordmark — the page title gives way first. */}
+              <span aria-hidden className="hidden h-6 w-px bg-black/10 sm:block" />
+              <div className="hidden leading-tight sm:block">
+                <span className="text-[19px] font-semibold tracking-tight text-ink">
+                  Store Reports
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Icon-only on a phone — the hamburger and the ⓘ took the width the
+                  label used to have, and the grid below ends in a New report tile
+                  anyway. */}
+              <button
+                onClick={onNew}
+                title="New report"
+                className="flex h-10 items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 sm:px-4"
+              >
+                <FilePlus2 size={16} />
+                <span className="hidden sm:inline">New report</span>
+              </button>
+              <WhatsNew />
+              <button
+                onClick={onSignOut}
+                title={email ? `Sign out of ${email}` : "Sign out"}
+                aria-label="Sign out"
+                className="grid h-10 w-10 place-items-center rounded-xl text-ink-soft transition hover:bg-black/[0.04] hover:text-ink"
+              >
+                <LogOut size={17} />
               </button>
             </div>
-          )}
-
-          {reports === null ? (
-            <div className="grid place-items-center py-24">
-              <Loader2 className="animate-spin text-ink-soft" size={22} />
-            </div>
-          ) : reports.length === 0 ? (
-            <EmptyState onNew={onNew} />
-          ) : (
-            <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-[13px] font-semibold uppercase tracking-wide text-ink-soft">
-                  {q
-                    ? `${total} of ${reports.length} report${reports.length > 1 ? "s" : ""}`
-                    : `${reports.length} report${reports.length > 1 ? "s" : ""}`}
-                </h1>
-                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                  <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
-                    <Search
-                      size={16}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
-                    />
-                    <input
-                      type="search"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search by store name or URL…"
-                      aria-label="Search reports"
-                      className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-[13px] text-ink shadow-sm outline-none transition placeholder:text-ink-soft/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                    />
-                  </div>
-                  <div className="relative">
-                    <ArrowUpDown
-                      size={15}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
-                    />
-                    <select
-                      value={sort}
-                      onChange={(e) => setSort(e.target.value as SortKey)}
-                      aria-label="Sort reports"
-                      className="appearance-none rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-9 text-[13px] font-medium text-ink shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-                    >
-                      {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-                        <option key={k} value={k}>
-                          {SORT_LABELS[k]}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={15}
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft"
-                    />
-                  </div>
-                </div>
-              </div>
-              {total === 0 ? (
-                <div className="grid place-items-center rounded-2xl border border-dashed border-black/10 bg-white/40 py-16 text-center">
-                  <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-black/[0.03] text-ink-soft">
-                    <Search size={22} />
-                  </div>
-                  <p className="text-[14px] font-semibold text-ink">
-                    No reports match “{query.trim()}”
-                  </p>
-                  <p className="mt-1 text-[13px] text-ink-soft">
-                    Try a different store name or URL.
-                  </p>
-                  <button
-                    onClick={() => setQuery("")}
-                    className="mt-4 rounded-lg px-3 py-1.5 text-[13px] font-medium text-brand-700 transition hover:bg-brand-50"
-                  >
-                    Clear search
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* The grid owns the whole viewport now, so it keeps adding
-                      columns rather than stretching cards; below sm a card is a
-                      full-width row. */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                    {pageItems.map((r) => (
-                      <ReportCard
-                        key={r.id}
-                        report={r}
-                        viewers={byReport.get(r.id) ?? []}
-                        onOpen={() => router.push(`/report/${r.id}`)}
-                        onDuplicate={() => onDuplicate(r.id)}
-                        onDelete={() => onDelete(r.id, r.data.storeName)}
-                      />
-                    ))}
-                    {!q && safePage === pageCount - 1 && (
-                      <button
-                        onClick={onNew}
-                        className="flex min-h-[172px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-white/40 text-brand-600 transition hover:border-brand-400 hover:bg-brand-50"
-                      >
-                        <FilePlus2 size={24} />
-                        <span className="text-[14px] font-semibold">New report</span>
-                      </button>
-                    )}
-                  </div>
-                  {pageCount > 1 && (
-                    <div className="mt-6 flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => setPage(safePage - 1)}
-                        disabled={safePage === 0}
-                        className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
-                      >
-                        <ChevronLeft size={16} /> Prev
-                      </button>
-                      <span className="px-2 text-[13px] text-ink-soft">
-                        Page {safePage + 1} of {pageCount}
-                      </span>
-                      <button
-                        onClick={() => setPage(safePage + 1)}
-                        disabled={safePage >= pageCount - 1}
-                        className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
-                      >
-                        Next <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </main>
-      </div>
-
-      {devStatus && (
-        <div
-          role="status"
-          className="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2"
-        >
-          <div className="flex items-center gap-2 rounded-xl bg-ink/90 px-3.5 py-2 text-[13px] font-medium text-white shadow-lg backdrop-blur">
-            {devBusy && <Loader2 size={14} className="animate-spin" />}
-            {devStatus}
           </div>
+        </header>
+
+        {/* The full width belongs to the reports — the team roster lives in the
+            drawer behind the hamburger above. */}
+        <div className="w-full px-4 py-8 sm:px-6 lg:px-8">
+          <main className="min-w-0">
+            {legacyCount > 0 && (
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-brand-600">
+                    <CloudUpload size={16} />
+                  </div>
+                  <div className="text-[13px] leading-snug text-ink">
+                    <span className="font-semibold">
+                      {legacyCount} report{legacyCount > 1 ? "s" : ""} saved in this browser
+                    </span>
+                    <span className="block text-ink-soft">
+                      From before reports synced to the cloud. Upload to keep
+                      {legacyCount > 1 ? " them" : " it"} on your account.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={onImportLegacy}
+                  disabled={importing}
+                  className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+                >
+                  {importing ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" /> Uploading…
+                    </>
+                  ) : (
+                    "Upload to cloud"
+                  )}
+                </button>
+              </div>
+            )}
+
+            {reports === null ? (
+              <div className="grid place-items-center py-24">
+                <Loader2 className="animate-spin text-ink-soft" size={22} />
+              </div>
+            ) : reports.length === 0 ? (
+              <EmptyState onNew={onNew} />
+            ) : (
+              <>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <h1 className="text-[13px] font-semibold uppercase tracking-wide text-ink-soft">
+                    {q
+                      ? `${total} of ${reports.length} report${reports.length > 1 ? "s" : ""}`
+                      : `${reports.length} report${reports.length > 1 ? "s" : ""}`}
+                  </h1>
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                    <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+                      <Search
+                        size={16}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                      />
+                      <input
+                        type="search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search by store name or URL…"
+                        aria-label="Search reports"
+                        className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-[13px] text-ink shadow-sm outline-none transition placeholder:text-ink-soft/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                      />
+                    </div>
+                    <div className="relative">
+                      <ArrowUpDown
+                        size={15}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                      />
+                      <select
+                        value={sort}
+                        onChange={(e) => setSort(e.target.value as SortKey)}
+                        aria-label="Sort reports"
+                        className="appearance-none rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-9 text-[13px] font-medium text-ink shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                      >
+                        {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                          <option key={k} value={k}>
+                            {SORT_LABELS[k]}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        size={15}
+                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {total === 0 ? (
+                  <div className="grid place-items-center rounded-2xl border border-dashed border-black/10 bg-white/40 py-16 text-center">
+                    <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-black/[0.03] text-ink-soft">
+                      <Search size={22} />
+                    </div>
+                    <p className="text-[14px] font-semibold text-ink">
+                      No reports match “{query.trim()}”
+                    </p>
+                    <p className="mt-1 text-[13px] text-ink-soft">
+                      Try a different store name or URL.
+                    </p>
+                    <button
+                      onClick={() => setQuery("")}
+                      className="mt-4 rounded-lg px-3 py-1.5 text-[13px] font-medium text-brand-700 transition hover:bg-brand-50"
+                    >
+                      Clear search
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Columns are fitted to the space rather than declared per
+                        breakpoint, because the space is no longer the viewport:
+                        opening the team panel takes 288px off this container, and
+                        auto-fill re-wraps the cards to suit without every width
+                        needing its own rule. `min()` keeps the track from
+                        overflowing a container narrower than a card. */}
+                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(19rem,100%),1fr))]">
+                      {pageItems.map((r) => (
+                        <ReportCard
+                          key={r.id}
+                          report={r}
+                          viewers={byReport.get(r.id) ?? []}
+                          onOpen={() => router.push(`/report/${r.id}`)}
+                          onDuplicate={() => onDuplicate(r.id)}
+                          onDelete={() => onDelete(r.id, r.data.storeName)}
+                        />
+                      ))}
+                      {!q && safePage === pageCount - 1 && (
+                        <button
+                          onClick={onNew}
+                          className="flex min-h-[172px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-brand-200 bg-white/40 text-brand-600 transition hover:border-brand-400 hover:bg-brand-50"
+                        >
+                          <FilePlus2 size={24} />
+                          <span className="text-[14px] font-semibold">New report</span>
+                        </button>
+                      )}
+                    </div>
+                    {pageCount > 1 && (
+                      <div className="mt-6 flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => setPage(safePage - 1)}
+                          disabled={safePage === 0}
+                          className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
+                        >
+                          <ChevronLeft size={16} /> Prev
+                        </button>
+                        <span className="px-2 text-[13px] text-ink-soft">
+                          Page {safePage + 1} of {pageCount}
+                        </span>
+                        <button
+                          onClick={() => setPage(safePage + 1)}
+                          disabled={safePage >= pageCount - 1}
+                          className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:bg-black/[0.03] disabled:pointer-events-none disabled:opacity-40"
+                        >
+                          Next <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </main>
         </div>
-      )}
-    </div>
+
+        {devStatus && (
+          <div
+            role="status"
+            className="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2"
+          >
+            <div className="flex items-center gap-2 rounded-xl bg-ink/90 px-3.5 py-2 text-[13px] font-medium text-white shadow-lg backdrop-blur">
+              {devBusy && <Loader2 size={14} className="animate-spin" />}
+              {devStatus}
+            </div>
+          </div>
+        )}
+      </div>
+    </TeamSidebar>
   );
 }
 
