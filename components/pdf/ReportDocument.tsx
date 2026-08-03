@@ -50,7 +50,7 @@ const PAGE_WIDTH = 595.28;
 
 /* ------------------------------------------------------------- block chrome */
 /** Outline weight of every content block (good, bad and the page-3 metrics). */
-const BLOCK_BORDER = 6.3;
+const BLOCK_BORDER = 1.3;
 /** Star strip under a rated block: glyph height plus the gap above it. */
 const STAR_SIZE = 8;
 const STAR_GAP = 5;
