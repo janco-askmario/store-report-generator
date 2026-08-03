@@ -497,7 +497,7 @@ export function ReportsLibrary() {
                   <>
                     {/* Columns are fitted to the space rather than declared per
                         breakpoint, because the space is no longer the viewport:
-                        opening the team panel takes 288px off this container, and
+                        opening the team panel takes 256px off this container, and
                         auto-fill re-wraps the cards to suit without every width
                         needing its own rule. `min()` keeps the track from
                         overflowing a container narrower than a card. */}

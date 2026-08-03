@@ -100,11 +100,12 @@ across browsers and devices instead of living in one browser's `localStorage`.
   a column of the layout rather than a sheet over it: the content column shrinks
   and the report grid (`repeat(auto-fill, …)`, not per-breakpoint columns)
   re-wraps to fit. Below `lg` it reverts to an overlay with a backdrop, since
-  pushing 288px on a phone leaves nothing to read. The open/closed choice is kept
-  in `localStorage` under `team-panel` — only when pushing, so dismissing the
-  overlay on a phone doesn't greet you with a closed panel on a desktop — and it
-  defaults to open. The hamburger and the panel are in different components, so
-  they talk over a context; `TeamSidebarToggle` is the button.
+  pushing a 256px column on a phone leaves nothing to read. The open/closed
+  choice is kept in `localStorage` under `team-panel` — only when pushing, so
+  dismissing the overlay on a phone doesn't greet you with a closed panel on a
+  desktop — and it defaults to open. The hamburger and the panel are in
+  different components, so they talk over a context; `TeamSidebarToggle` is the
+  button.
 - **Avatars** (`lib/avatars.ts`, `public/avatars/`) — 16×16 pixel portraits,
   matched to people by the local part of their email (`james@…`, `james.smith@…`
   and `jamesb@…` all get `james.png`); addresses that don't carry the person's

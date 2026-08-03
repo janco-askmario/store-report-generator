@@ -23,7 +23,7 @@ import { cx } from "@/components/ui";
  * reports re-wrap into what is left, so you can read the roster and keep
  * working. That only holds while there is width to give away — below `lg` the
  * same panel goes back to floating over the page with a backdrop, because
- * pushing a 288px column on a 390px phone would leave the reports unreadable.
+ * pushing a 256px column on a 390px phone would leave the reports unreadable.
  *
  * The shell wraps the whole page (header included, which is what "full height"
  * requires), while the button that opens it lives inside the header. They talk
@@ -33,8 +33,12 @@ import { cx } from "@/components/ui";
 
 const STORAGE_KEY = "team-panel";
 const WIDE = "(min-width: 1024px)";
-/** Matches the `w-72` on the panel; the layout has to agree with the CSS. */
-const WIDTH = "w-72";
+/**
+ * Panel width. 16rem is as narrow as the rows go before a name like "Jacques Du
+ * Plessis" starts truncating against its status line — and 2rem less of the page
+ * to give away when the panel is open.
+ */
+const WIDTH = "w-64";
 
 interface TeamSidebarContext {
   open: boolean;

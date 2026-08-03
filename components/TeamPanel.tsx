@@ -95,26 +95,16 @@ export function TeamPanel({
             Team
           </h2>
         </div>
-        <div className="flex items-center gap-1">
-          {members !== null && (
-            <span
-              className="flex items-center gap-1.5 rounded-full bg-leaf-50 px-2 py-1 text-[11px] font-semibold text-leaf-700"
-              // aria-live so a screen reader hears people arrive and leave without
-              // having to go looking for the list.
-              aria-live="polite"
-            >
-              <span
-                aria-hidden
-                className={cx(
-                  "h-1.5 w-1.5 rounded-full",
-                  online.length > 0 ? "animate-pulse bg-leaf-500" : "bg-black/20",
-                )}
-              />
-              {online.length} of {rows.length} online
-            </span>
-          )}
-          {action}
-        </div>
+        {/* The tally used to sit here as a pill, and it was the widest thing in
+            the panel for something the "Online — 2" heading below already says.
+            Only the announcement was worth keeping: aria-live so a screen reader
+            hears people arrive and leave without going looking for the list. */}
+        {members !== null && (
+          <span className="sr-only" aria-live="polite">
+            {online.length} of {rows.length} teammates online
+          </span>
+        )}
+        {action}
       </header>
 
       {members === null ? (
