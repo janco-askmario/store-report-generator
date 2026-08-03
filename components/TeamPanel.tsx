@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { Loader2, Users } from "lucide-react";
+import { Info, Loader2, Users } from "lucide-react";
 import type { Presence, PresentUser } from "@/lib/presence";
 import { displayName, useTeamRoster, type TeamMember } from "@/lib/team";
 import { Avatar } from "@/components/Avatar";
@@ -63,6 +63,17 @@ export function TeamPanel({
   const online = rows.filter((r) => r.online);
   const offline = rows.filter((r) => !r.online);
   const drawer = variant === "drawer";
+
+  /*
+   * The roster came back with nothing but this account.
+   *
+   * RLS filters rather than fails, so a missing read policy — or missing profile
+   * rows — arrives as a perfectly successful query returning one row, and the
+   * panel would quietly look like a one-person company. The tell is that
+   * teammates then appear only while they are connected, via presence, and
+   * vanish when they close the tab. Worth naming, because nothing else will.
+   */
+  const soloRoster = members !== null && members.length <= 1 && !error;
 
   return (
     <section
@@ -139,6 +150,19 @@ export function TeamPanel({
             ))}
           </Group>
         </div>
+      )}
+
+      {soloRoster && (
+        <p className="shrink-0 border-t border-black/5 bg-warn/[0.06] px-4 py-3 text-[11px] leading-relaxed text-ink-soft">
+          <Info size={12} className="mr-1 inline align-[-2px] text-warn" />
+          Only your own profile is readable, so teammates show up here only while
+          they are online. If they have accounts, their roster rows or the read
+          policy are missing — run{" "}
+          <code className="rounded bg-black/[0.05] px-1 py-px text-[10px]">
+            20260803000000_team_directory_repair.sql
+          </code>{" "}
+          in the Supabase SQL editor.
+        </p>
       )}
     </section>
   );
