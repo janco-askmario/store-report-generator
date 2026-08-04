@@ -1,8 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/** Paths reachable without a session. */
-const PUBLIC_PATHS = ["/login", "/auth"];
+/**
+ * Paths reachable without a session.
+ *
+ * /reset-password is here because Supabase's stock recovery template can land
+ * on it with the tokens in the URL fragment, which never reaches the server —
+ * bouncing it to /login would strip the one thing that lets the page work. The
+ * page is inert without a session, so it gives nothing away.
+ */
+const PUBLIC_PATHS = ["/login", "/auth", "/reset-password"];
 
 export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -70,7 +77,13 @@ export async function middleware(request: NextRequest) {
   if (!approved) {
     // Let the auth callback finish its own redirect; funnel everything else to
     // the holding page. `/pending` itself is reachable so it can render.
-    if (pathname === "/pending" || pathname.startsWith("/auth")) {
+    // A locked-out account still has to be able to finish a password reset,
+    // otherwise the link dead-ends on the holding page.
+    if (
+      pathname === "/pending" ||
+      pathname === "/reset-password" ||
+      pathname.startsWith("/auth")
+    ) {
       return supabaseResponse;
     }
     const url = request.nextUrl.clone();

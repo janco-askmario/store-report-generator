@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "render:sample": "tsx --tsconfig tsconfig.script.json scripts/render-sample.mts"
+    "render:sample": "tsx --tsconfig tsconfig.script.json scripts/render-sample.mts",
+    "set-password": "tsx --tsconfig tsconfig.script.json scripts/set-password.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
