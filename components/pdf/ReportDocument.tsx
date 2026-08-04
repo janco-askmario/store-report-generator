@@ -8,6 +8,7 @@ import {
   Svg,
   Path,
 } from "@react-pdf/renderer";
+import type { ReactNode } from "react";
 import type { Block, ReportData } from "@/lib/types";
 import { registerFonts } from "@/lib/pdf-fonts";
 import {
@@ -49,7 +50,12 @@ registerFonts();
 const PAGE_WIDTH = 595.28;
 
 /* ------------------------------------------------------------- block chrome */
-/** Outline weight of every content block (good, bad and the page-3 metrics). */
+/**
+ * Outline weight of every framed container: the good/bad blocks, the page-3
+ * metrics, and the green panels (Notes, Food for Thought, Golden Rules, Action
+ * Plan). All of them draw the outline as a filled layer rather than a border —
+ * see `blockFrame`.
+ */
 const BLOCK_BORDER = 4.3;
 /** Star strip under a rated block: glyph height plus the gap above it. */
 const STAR_SIZE = 11.5;
@@ -252,14 +258,18 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
 
-  /* green bordered boxes */
-  greenBox: {
-    borderWidth: 1.5,
-    borderColor: C.green,
+  /* green bordered boxes — framed the same way as the blocks */
+  greenFrame: {
+    backgroundColor: C.green,
     borderRadius: 3,
+    padding: BLOCK_BORDER,
+    marginTop: 8,
+  },
+  greenInner: {
+    backgroundColor: C.beige,
+    borderRadius: 1,
     paddingVertical: 11,
     paddingHorizontal: 14,
-    marginTop: 8,
   },
   boxHeading: {
     fontFamily: "Montserrat",
@@ -434,7 +444,10 @@ const COL_W = CONTENT_W * 0.318;
 const BLOCK_INNER_W = COL_W - BLOCK_BORDER * 2;
 const FILL_W = COL_W - 12; // blockFill paddingHorizontal
 const TITLE_W = BLOCK_INNER_W - 10; // blockTitle paddingHorizontal
-const BOX_W = CONTENT_W - 32;
+// Green panel text width: frame on both sides plus greenInner's 14pt padding.
+const BOX_W = CONTENT_W - BLOCK_BORDER * 2 - 28;
+/** marginTop + frame top/bottom + greenInner's vertical padding. */
+const BOX_CHROME_H = 8 + BLOCK_BORDER * 2 + 22;
 const SECTION_H = 20 + 12; // header line + marginBottom (marginTop added by caller)
 
 function lineCount(
@@ -515,8 +528,7 @@ function estGrid(blocks: BlockLike[], topPad: number): number {
 }
 function estBox(body: string, bodyFont: number, hasSub: boolean): number {
   return (
-    8 +
-    22 +
+    BOX_CHROME_H +
     (12.5 * 1.25 + 5) +
     (hasSub ? 10 * 1.25 + 6 : 0) +
     lineCount(body, bodyFont, BOX_W, 0.55) * bodyFont * 1.45
@@ -552,7 +564,7 @@ function estimateHeights(data: ReportData): [number, number, number] {
       5,
     0,
   );
-  h2 += 8 + 22 + (12.5 * 1.25 + 5) + rulesH; // golden rules box
+  h2 += BOX_CHROME_H + (12.5 * 1.25 + 5) + rulesH; // golden rules box
   h2 += 8 + 18 + 12.5 * 1.25; // "directly affect the bottom line" bar
   h2 += estBox(GOLDEN_RULES_CLOSER_2, 8.5, false); // closer box (heading est adds slack)
   h2 += 24;
@@ -582,7 +594,7 @@ function estimateHeights(data: ReportData): [number, number, number] {
       7,
     0,
   );
-  h3 += 8 + 22 + (12.5 * 1.25 + 5) + (10 * 1.25 + 6) + actionsH; // action box
+  h3 += BOX_CHROME_H + (12.5 * 1.25 + 5) + (10 * 1.25 + 6) + actionsH; // action box
   h3 += 8 + 18 + 12.5 * 1.25; // closing bar
   h3 += 24;
 
@@ -647,6 +659,15 @@ function StarRow({ rating, color }: { rating: number; color: string }) {
 }
 
 /* -------------------------------------------------------------- helpers */
+/** A green-outlined panel: Notes, Food for Thought, Golden Rules, Action Plan. */
+function GreenBox({ children }: { children: ReactNode }) {
+  return (
+    <View style={s.greenFrame}>
+      <View style={s.greenInner}>{children}</View>
+    </View>
+  );
+}
+
 function Paragraphs({ text, fontSize }: { text: string; fontSize?: number }) {
   const paras = text
     .split(/\n{2,}/)
@@ -890,13 +911,13 @@ export function ReportDocument({ data }: { data: ReportData }) {
           {data.goodCustom.trim() ? (
             <>
               <Text style={s.sectionHeader}>{LABELS.notes}</Text>
-              <View style={s.greenBox}>
+              <GreenBox>
                 <Text style={s.boxHeading}>{LABELS.successMultiFaceted}</Text>
                 <Paragraphs
                   text={data.goodCustom}
                   fontSize={fitBody(data.goodCustom)}
                 />
-              </View>
+              </GreenBox>
             </>
           ) : null}
 
@@ -923,14 +944,14 @@ export function ReportDocument({ data }: { data: ReportData }) {
               {"  "}Thought
             </Text>
           </View>
-          <View style={s.greenBox}>
+          <GreenBox>
             <Text style={s.boxHeading}>{FOOD_FOR_THOUGHT_HEADING}</Text>
             <Text style={s.boxSub}>{FOOD_FOR_THOUGHT_SUBHEADING}</Text>
             <Paragraphs
               text={data.foodForThought}
               fontSize={fitBody(data.foodForThought)}
             />
-          </View>
+          </GreenBox>
         </View>
       </Page>
 
@@ -942,7 +963,7 @@ export function ReportDocument({ data }: { data: ReportData }) {
           </Text>
           <BlockGrid blocks={bad} kind="bad" />
 
-          <View style={s.greenBox}>
+          <GreenBox>
             <Text style={s.boxHeading}>{GOLDEN_RULES_HEADING}</Text>
             {GOLDEN_RULES.map((r, i) => (
               <View key={i} style={s.ruleRow}>
@@ -953,15 +974,15 @@ export function ReportDocument({ data }: { data: ReportData }) {
                 </Text>
               </View>
             ))}
-          </View>
+          </GreenBox>
 
           <View style={s.greenBar}>
             <Text style={s.greenBarText}>{GOLDEN_RULES_CLOSER_1}</Text>
           </View>
 
-          <View style={s.greenBox}>
+          <GreenBox>
             <Text style={s.body}>{GOLDEN_RULES_CLOSER_2}</Text>
-          </View>
+          </GreenBox>
         </View>
       </Page>
 
@@ -1013,7 +1034,7 @@ export function ReportDocument({ data }: { data: ReportData }) {
           <Text style={s.sectionHeader}>{LABELS.actionPlanSummary}</Text>
           <Text style={s.tagline}>{LABELS.actionTagline}</Text>
 
-          <View style={s.greenBox}>
+          <GreenBox>
             <Text style={s.boxHeading}>{LABELS.actionSubtitle}</Text>
             <Text style={s.boxSub}>{LABELS.actionSubtitle2}</Text>
             {actions.map((a, i) => (
@@ -1028,7 +1049,7 @@ export function ReportDocument({ data }: { data: ReportData }) {
                 </Text>
               </Text>
             ))}
-          </View>
+          </GreenBox>
 
           <View style={s.greenBar}>
             <Text style={s.greenBarText}>{LABELS.closing}</Text>
