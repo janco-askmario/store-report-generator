@@ -169,12 +169,20 @@ const s = StyleSheet.create({
   },
 
   blockWrap: { position: "relative", paddingTop: 22, width: "100%" },
-  blockBox: {
-    borderWidth: BLOCK_BORDER,
+  /**
+   * The outline is a filled rectangle with the content inset on top of it, not
+   * a `borderWidth`. react-pdf draws a border as four mitered polygons, and at
+   * anything heavier than a hairline the diagonal seam where two edges meet
+   * leaves the page showing through at each corner.
+   */
+  blockFrame: {
     borderRadius: 2,
+    padding: BLOCK_BORDER,
+  },
+  blockInner: {
+    backgroundColor: C.beige, // the page colour, so the frame reads as an outline
     paddingTop: 26,
     paddingBottom: 0,
-    alignItems: "center",
   },
   starRow: {
     flexDirection: "row",
@@ -194,7 +202,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 5,
   },
   blockFill: {
-    width: "100%",
+    // Bleeds back out over the frame it sits on. Same colour, so the join is
+    // invisible — and two abutting shapes can't leave a seam if they overlap.
+    // Its outer edge now *is* the block's edge, so it carries the frame radius.
+    marginHorizontal: -BLOCK_BORDER,
+    marginBottom: -BLOCK_BORDER,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
     paddingVertical: 6,
     paddingHorizontal: 6,
     justifyContent: "center",
@@ -361,7 +375,15 @@ function fitFill(text: string): number {
   );
 }
 function fitTitle(text: string): number {
-  return fitStep(text.length, [[30, 8], [44, 7.4], [60, 6.8]], 6.2);
+  return fitStep(
+    text.length,
+    [
+      [30, 8],
+      [44, 7.4],
+      [60, 6.8],
+    ],
+    6.2,
+  );
 }
 function fitBody(text: string): number {
   return fitStep(
@@ -377,7 +399,15 @@ function fitBody(text: string): number {
   );
 }
 function fitMetricValue(v: string): number {
-  return fitStep(v.length, [[6, 12], [9, 10.5], [12, 9]], 8);
+  return fitStep(
+    v.length,
+    [
+      [6, 12],
+      [9, 10.5],
+      [12, 9],
+    ],
+    8,
+  );
 }
 function fitActions(text: string): number {
   return fitStep(
@@ -399,14 +429,20 @@ function fitActions(text: string): number {
 // an extra page.
 const CONTENT_W = PAGE_WIDTH - 52;
 const COL_W = CONTENT_W * 0.318;
-// Borders sit inside the box, so a heavier outline leaves less room for text.
+// The frame insets the content, so a heavier outline leaves less room for the
+// title. The fill bleeds back over the frame, so it keeps the full width.
 const BLOCK_INNER_W = COL_W - BLOCK_BORDER * 2;
-const FILL_W = BLOCK_INNER_W - 12; // blockFill paddingHorizontal
+const FILL_W = COL_W - 12; // blockFill paddingHorizontal
 const TITLE_W = BLOCK_INNER_W - 10; // blockTitle paddingHorizontal
 const BOX_W = CONTENT_W - 32;
 const SECTION_H = 20 + 12; // header line + marginBottom (marginTop added by caller)
 
-function lineCount(text: string, font: number, width: number, cf = 0.55): number {
+function lineCount(
+  text: string,
+  font: number,
+  width: number,
+  cf = 0.55,
+): number {
   const cpl = Math.max(6, Math.floor(width / (font * cf)));
   const paras = text
     .split(/\n{2,}/)
@@ -456,7 +492,9 @@ function showsStars(blocks: BlockLike[]): boolean {
 function uniformBlockHeight(blocks: BlockLike[], topPad = 26): number {
   if (!blocks.length) return 0;
   const stars = showsStars(blocks);
-  return Math.ceil(Math.max(...blocks.map((b) => estBlock(b, topPad, stars))) + 4);
+  return Math.ceil(
+    Math.max(...blocks.map((b) => estBlock(b, topPad, stars))) + 4,
+  );
 }
 /** The metric circle is bigger than a block icon, so it needs more head room. */
 const METRIC_TOP_PAD = 46;
@@ -486,15 +524,20 @@ function estBox(body: string, bodyFont: number, hasSub: boolean): number {
 }
 
 function estimateHeights(data: ReportData): [number, number, number] {
-  const good = data.goodBlocks.filter((b) => b.title.trim() || b.paragraph.trim());
-  const bad = data.badBlocks.filter((b) => b.title.trim() || b.paragraph.trim());
+  const good = data.goodBlocks.filter(
+    (b) => b.title.trim() || b.paragraph.trim(),
+  );
+  const bad = data.badBlocks.filter(
+    (b) => b.title.trim() || b.paragraph.trim(),
+  );
 
   // ---- Page 1
   const band = 18 + (data.logo ? 52 : 0) + 30 + 18 + 16 + 18;
   let h1 = band;
   h1 += 16 + SECTION_H + estGrid(good, 26);
   if (data.goodCustom.trim())
-    h1 += 16 + SECTION_H + estBox(data.goodCustom, fitBody(data.goodCustom), false);
+    h1 +=
+      16 + SECTION_H + estBox(data.goodCustom, fitBody(data.goodCustom), false);
   h1 += 50 + estBox(data.foodForThought, fitBody(data.foodForThought), true);
   h1 += 24;
 
@@ -565,7 +608,10 @@ function RichRuns({ text }: { text: string }) {
           style={{
             ...(run.bold ? { fontWeight: 700 } : {}),
             ...(run.italic
-              ? { fontStyle: "italic" as const, fontWeight: run.bold ? 700 : 400 }
+              ? {
+                  fontStyle: "italic" as const,
+                  fontWeight: run.bold ? 700 : 400,
+                }
               : {}),
             ...(run.underline ? { textDecoration: "underline" as const } : {}),
           }}
@@ -637,7 +683,10 @@ function parseActionItems(text: string) {
     // splitting mid-marker would strand a "**" in the middle of the sentence.
     const marker = chunk.search(/\*\*|__|\*/);
     if (idx > 0 && idx <= 64 && (marker === -1 || idx < marker)) {
-      return { title: chunk.slice(0, idx).trim(), body: chunk.slice(idx + 1).trim() };
+      return {
+        title: chunk.slice(0, idx).trim(),
+        body: chunk.slice(idx + 1).trim(),
+      };
     }
     return { body: chunk };
   });
@@ -654,45 +703,61 @@ function ContentBlock({
 }) {
   return (
     <View style={[s.blockWrap, { flexGrow: 1 }]} wrap={false}>
-      <View style={[s.blockBox, { borderColor: color, flexGrow: 1 }]}>
-        {block.title ? (
-          <Text style={[s.blockTitle, { fontSize: fitTitle(block.title) }]}>
-            {block.title}
-          </Text>
-        ) : (
-          <Text style={s.blockTitle}> </Text>
-        )}
-        {block.paragraph ? (
-          // flexShrink 0: if the estimate ever falls short the box grows rather
-          // than squeezing (and clipping) the paragraph.
-          <View
-            style={[s.blockFill, { backgroundColor: color, flexGrow: 1, flexShrink: 0 }]}
-          >
-            <Text
+      <View style={[s.blockFrame, { backgroundColor: color, flexGrow: 1 }]}>
+        <View style={[s.blockInner, { flexGrow: 1 }]}>
+          {block.title ? (
+            <Text style={[s.blockTitle, { fontSize: fitTitle(block.title) }]}>
+              {block.title}
+            </Text>
+          ) : (
+            <Text style={s.blockTitle}> </Text>
+          )}
+          {block.paragraph ? (
+            // flexShrink 0: if the estimate ever falls short the box grows rather
+            // than squeezing (and clipping) the paragraph.
+            <View
               style={[
-                s.blockFillText,
-                { fontSize: fitFill(toPlain(block.paragraph)) },
+                s.blockFill,
+                { backgroundColor: color, flexGrow: 1, flexShrink: 0 },
               ]}
             >
-              <RichRuns text={block.paragraph} />
-            </Text>
-          </View>
-        ) : (
-          <View style={{ flexGrow: 1 }} />
-        )}
+              <Text
+                style={[
+                  s.blockFillText,
+                  { fontSize: fitFill(toPlain(block.paragraph)) },
+                ]}
+              >
+                <RichRuns text={block.paragraph} />
+              </Text>
+            </View>
+          ) : (
+            <View style={{ flexGrow: 1 }} />
+          )}
+        </View>
       </View>
       {/* The rating the block was given in the editor, under its own block. */}
       {showStars ? <StarRow rating={block.rating} color={color} /> : null}
       <View style={s.circleOverlay}>
         <View style={[s.circle, { backgroundColor: color }]}>
-          <PdfIcon name={block.icon} size={21} color={C.ink} strokeWidth={1.8} />
+          <PdfIcon
+            name={block.icon}
+            size={21}
+            color={C.ink}
+            strokeWidth={1.8}
+          />
         </View>
       </View>
     </View>
   );
 }
 
-function BlockGrid({ blocks, kind }: { blocks: Block[]; kind: "good" | "bad" }) {
+function BlockGrid({
+  blocks,
+  kind,
+}: {
+  blocks: Block[];
+  kind: "good" | "bad";
+}) {
   // One height for the whole section: rows stretch their columns to match each
   // other, and the shared minHeight lifts every row up to the wordiest block.
   const rowHeight = uniformBlockHeight(blocks);
@@ -735,21 +800,26 @@ function MetricBlock({
 }) {
   return (
     <View style={[s.blockWrap, { flexGrow: 1 }]} wrap={false}>
-      <View
-        style={[s.blockBox, { borderColor: color, paddingTop: 46, flexGrow: 1 }]}
-      >
-        <Text style={[s.blockTitle, { fontSize: fitTitle(label) }]}>{label}</Text>
-        {note ? (
-          <View
-            style={[s.blockFill, { backgroundColor: color, flexGrow: 1, flexShrink: 0 }]}
-          >
-            <Text style={[s.blockFillText, { fontSize: fitFill(note) }]}>
-              {note}
-            </Text>
-          </View>
-        ) : (
-          <View style={{ flexGrow: 1 }} />
-        )}
+      <View style={[s.blockFrame, { backgroundColor: color, flexGrow: 1 }]}>
+        <View style={[s.blockInner, { paddingTop: 46, flexGrow: 1 }]}>
+          <Text style={[s.blockTitle, { fontSize: fitTitle(label) }]}>
+            {label}
+          </Text>
+          {note ? (
+            <View
+              style={[
+                s.blockFill,
+                { backgroundColor: color, flexGrow: 1, flexShrink: 0 },
+              ]}
+            >
+              <Text style={[s.blockFillText, { fontSize: fitFill(note) }]}>
+                {note}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ flexGrow: 1 }} />
+          )}
+        </View>
       </View>
       <View style={s.circleOverlay}>
         <View style={[s.metricCircle, { backgroundColor: color }]}>
@@ -777,12 +847,19 @@ export function ReportDocument({ data }: { data: ReportData }) {
       ? `${formatDateLong(data.startDate)} to ${formatDateLong(data.reportDate)}`
       : formatDateLong(data.reportDate || data.startDate);
 
-  const good = data.goodBlocks.filter((b) => b.title.trim() || b.paragraph.trim());
-  const bad = data.badBlocks.filter((b) => b.title.trim() || b.paragraph.trim());
+  const good = data.goodBlocks.filter(
+    (b) => b.title.trim() || b.paragraph.trim(),
+  );
+  const bad = data.badBlocks.filter(
+    (b) => b.title.trim() || b.paragraph.trim(),
+  );
   const actions = parseActionItems(data.actionPlan);
   const actionSize = fitActions(toPlain(data.actionPlan));
   const bulb = getIcon("bulb");
-  const metricHeight = uniformBlockHeight(metricBlockLikes(data), METRIC_TOP_PAD);
+  const metricHeight = uniformBlockHeight(
+    metricBlockLikes(data),
+    METRIC_TOP_PAD,
+  );
   const [pageH1, pageH2, pageH3] = estimateHeights(data);
 
   return (
@@ -945,9 +1022,7 @@ export function ReportDocument({ data }: { data: ReportData }) {
                 style={[s.actionItem, { fontSize: actionSize }]}
                 wrap={false}
               >
-                {a.title ? (
-                  <Text style={s.actionLead}>{a.title}: </Text>
-                ) : null}
+                {a.title ? <Text style={s.actionLead}>{a.title}: </Text> : null}
                 <Text style={s.actionBody}>
                   <RichRuns text={a.body} />
                 </Text>
