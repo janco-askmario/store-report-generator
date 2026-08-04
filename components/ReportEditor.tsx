@@ -26,7 +26,6 @@ import {
   Circle,
   Cloud,
   CloudOff,
-  Download,
   Eraser,
   FileText,
   Gauge,
@@ -79,7 +78,6 @@ import {
   PreviewSidebar,
   PreviewSidebarToggle,
 } from "@/components/PreviewSidebar";
-import { reportFileName, renderReportPdf } from "@/components/pdf/render";
 import { TeamSidebar, TeamSidebarToggle } from "@/components/TeamSidebar";
 import { WhatsNew } from "@/components/WhatsNew";
 import { CollabTextAreaField, RichTextArea } from "@/components/CollabField";
@@ -93,7 +91,6 @@ import {
   cx,
 } from "@/components/ui";
 
-type Busy = "idle" | "download";
 type BlockKind = "good" | "bad";
 
 /* Resize an uploaded image so logos stay small in localStorage / the PDF. */
@@ -357,7 +354,6 @@ function VerdictRow({
 /* ============================================================ EDITOR */
 export function ReportEditor({ id }: { id: string }) {
   const router = useRouter();
-  const [busy, setBusy] = useState<Busy>("idle");
   const fileRef = useRef<HTMLInputElement>(null);
 
   /*
@@ -438,27 +434,10 @@ export function ReportEditor({ id }: { id: string }) {
     }
   };
 
-  /* PDF. Previewing is the panel's job now (`components/PreviewSidebar.tsx`);
-     what is left here is the one-off render that produces a file to keep. */
-  const handleDownload = async () => {
-    setBusy("download");
-    try {
-      const blob = await renderReportPdf(data as ReportData);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = reportFileName(data?.storeName ?? "");
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-    } catch (e) {
-      console.error(e);
-      alert("Something went wrong generating the PDF. Check the console.");
-    } finally {
-      setBusy("idle");
-    }
-  };
+  /* PDF is entirely the preview panel's job (`components/PreviewSidebar.tsx`):
+     it already holds a rendered blob of exactly what you are looking at, and
+     downloads that. A second Generate button here would re-render the same
+     document a second time to produce the same file. */
 
   /* derived */
   const metrics = useMemo(() => (data ? computeMetrics(data) : null), [data]);
@@ -570,7 +549,6 @@ export function ReportEditor({ id }: { id: string }) {
   const cartV = addToCartVerdict(metrics.addToCartConversion);
   const aovV = aovVerdict(aov, num(data.analytics.aovBenchmark) || null);
   const fulV = fulfillmentVerdict(metrics.fulfillmentRate);
-  const genDisabled = busy !== "idle";
 
   return (
     <TeamSidebar presence={presence} reportNames={reportNames}>
@@ -652,25 +630,9 @@ export function ReportEditor({ id }: { id: string }) {
                 >
                   <Eraser size={15} /> Clear
                 </button>
-                {/* The PDF pair gives way as the header narrows — icon-only below
-                    md, gone below sm — because both are repeated in full at the
-                    bottom of the form on anything narrower than xl, while undo and
-                    the drawers exist nowhere else. Preview opens the live panel
-                    down the right-hand side rather than a tab. */}
+                {/* Preview opens the live panel down the right-hand side, and
+                    the file itself is downloaded from inside it. */}
                 <PreviewSidebarToggle />
-                <button
-                  onClick={handleDownload}
-                  disabled={genDisabled}
-                  title="Generate the PDF"
-                  className="hidden h-10 items-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-3 text-[13px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 disabled:opacity-60 sm:flex md:px-4"
-                >
-                  {busy === "download" ? (
-                    <Loader2 size={15} className="animate-spin" />
-                  ) : (
-                    <Download size={15} />
-                  )}
-                  <span className="hidden md:inline">Generate PDF</span>
-                </button>
                 {/* Same corner, same control, as on the dashboard. */}
                 <WhatsNew />
               </div>
@@ -1148,21 +1110,10 @@ export function ReportEditor({ id }: { id: string }) {
                 </p>
               </SectionCard>
 
-              {/* mobile generate */}
+              {/* The preview panel is reachable from here too, since the header
+                  pair collapses on anything narrower than xl. */}
               <div className="flex gap-2 xl:hidden">
                 <PreviewSidebarToggle variant="block" />
-                <button
-                  onClick={handleDownload}
-                  disabled={genDisabled}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-3 text-[14px] font-semibold text-white shadow-md disabled:opacity-60"
-                >
-                  {busy === "download" ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Download size={16} />
-                  )}
-                  Generate PDF
-                </button>
               </div>
             </div>
 
@@ -1289,18 +1240,6 @@ export function ReportEditor({ id }: { id: string }) {
                   )}
                 </div>
 
-                <button
-                  onClick={handleDownload}
-                  disabled={genDisabled}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-brand-500/30 transition hover:brightness-110 disabled:opacity-60"
-                >
-                  {busy === "download" ? (
-                    <Loader2 size={17} className="animate-spin" />
-                  ) : (
-                    <Download size={17} />
-                  )}
-                  Generate PDF Report
-                </button>
               </div>
             </aside>
           </main>
