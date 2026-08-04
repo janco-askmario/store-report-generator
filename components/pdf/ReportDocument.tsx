@@ -52,7 +52,7 @@ const PAGE_WIDTH = 595.28;
 /** Outline weight of every content block (good, bad and the page-3 metrics). */
 const BLOCK_BORDER = 4.3;
 /** Star strip under a rated block: glyph height plus the gap above it. */
-const STAR_SIZE = 8;
+const STAR_SIZE = 11.5;
 const STAR_GAP = 5;
 const STAR_ROW_H = STAR_SIZE + STAR_GAP;
 
@@ -636,7 +636,7 @@ function StarRow({ rating, color }: { rating: number; color: string }) {
   return (
     <View style={s.starRow}>
       {[0, 1, 2, 3, 4].map((i) => (
-        <View key={i} style={{ marginHorizontal: 0.7 }}>
+        <View key={i} style={{ marginHorizontal: 1 }}>
           <Svg width={STAR_SIZE} height={STAR_SIZE} viewBox="0 0 24 24">
             <Path d={STAR_D} fill={i < rating ? color : C.muted} />
           </Svg>
