@@ -9,7 +9,15 @@ import { NextResponse, type NextRequest } from "next/server";
  * bouncing it to /login would strip the one thing that lets the page work. The
  * page is inert without a session, so it gives nothing away.
  */
-const PUBLIC_PATHS = ["/login", "/auth", "/reset-password"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth",
+  "/reset-password",
+  // Nobody is signed in when they reset a forgotten password — that is the whole
+  // situation. Left out, the redirect below would turn the POST into a 307 at
+  // /login and the fetch would never reach the handler.
+  "/api/password-reset",
+];
 
 export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

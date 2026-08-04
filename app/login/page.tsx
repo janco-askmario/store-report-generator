@@ -3,11 +3,17 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cx } from "@/components/ui";
 
-type Mode = "signin" | "signup";
+/**
+ * "reset" is the no-mailer password reset: type your address and a new password
+ * and the account takes it immediately — but drops back to unapproved, so an
+ * admin has to let you in again. app/api/password-reset/route.ts explains why
+ * that lock is what makes an unauthenticated reset endpoint safe to expose.
+ */
+type Mode = "signin" | "signup" | "reset";
 
 /** Supabase's raw auth errors leak implementation detail — say it plainly. */
 function friendlyError(message: string, mode: Mode): string {
@@ -43,11 +49,13 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(searchParams.get("error"));
+  const [resetDone, setResetDone] = useState(false);
 
   const switchMode = (m: Mode) => {
     setMode(m);
     setError(null);
     setConfirm("");
+    setResetDone(false);
   };
 
   const goToApp = () => {
@@ -60,7 +68,9 @@ function LoginForm() {
     e.preventDefault();
     setError(null);
 
-    if (mode === "signup") {
+    // Both modes that *choose* a password confirm it: a typo in either is
+    // unrecoverable without email resets.
+    if (mode !== "signin") {
       if (password !== confirm) {
         setError("The two passwords don't match.");
         return;
@@ -72,6 +82,27 @@ function LoginForm() {
     }
 
     setSubmitting(true);
+
+    if (mode === "reset") {
+      const res = await fetch("/api/password-reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const body = await res.json().catch(() => ({}) as { error?: string });
+
+      if (!res.ok) {
+        setError(body.error ?? "Could not reset the password. Try again.");
+        setSubmitting(false);
+        return;
+      }
+      // No redirect: the account is locked until an admin re-approves it, so
+      // signing in right now would only land them on /pending.
+      setResetDone(true);
+      setSubmitting(false);
+      return;
+    }
+
     const supabase = createClient();
 
     if (mode === "signin") {
@@ -113,6 +144,36 @@ function LoginForm() {
   };
 
   const isSignup = mode === "signup";
+  const isReset = mode === "reset";
+  /** Signup and reset both pick a new password; sign-in supplies an existing one. */
+  const choosesPassword = isSignup || isReset;
+
+  if (resetDone) {
+    return (
+      <div className="text-center">
+        <CheckCircle2 className="mx-auto mb-3 text-emerald-600" size={26} />
+        <h1 className="text-[18px] font-semibold tracking-tight text-ink">
+          Password updated
+        </h1>
+        <p className="mt-2 text-[13px] text-ink-soft">
+          If <span className="font-semibold text-ink">{email}</span> has an
+          account, its password is now the one you just chose — and the account
+          is locked until an admin approves it again.
+        </p>
+        <p className="mt-3 text-[13px] text-ink-soft">
+          Message whoever runs the reports dashboard and ask them to re-approve
+          you. It takes them a few seconds.
+        </p>
+        <button
+          type="button"
+          onClick={() => switchMode("signin")}
+          className="mt-5 w-full rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2.5 text-[14px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110"
+        >
+          Back to sign in
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -129,20 +190,25 @@ function LoginForm() {
           className="mx-auto mb-4 h-11 w-auto"
         />
         <h1 className="text-[18px] font-semibold tracking-tight text-ink">
-          Store Reports
+          {isReset ? "Reset your password" : "Store Reports"}
         </h1>
         <p className="mt-1 text-[13px] text-ink-soft">
-          {isSignup
-            ? "Create an account with your AskMario email — an admin approves it before you can sign in."
-            : "Sign in to open the AskMario report library."}
+          {isReset
+            ? "Choose a new password for your account. An admin re-approves you before you can sign in — this locks the account until they do."
+            : isSignup
+              ? "Create an account with your AskMario email — an admin approves it before you can sign in."
+              : "Sign in to open the AskMario report library."}
         </p>
       </div>
 
-      {/* Mode switch */}
+      {/* Mode switch. Hidden during a reset, which is neither tab. */}
       <div
         role="tablist"
         aria-label="Sign in or create account"
-        className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-black/[0.04] p-1"
+        className={cx(
+          "mb-5 grid grid-cols-2 gap-1 rounded-xl bg-black/[0.04] p-1",
+          isReset && "hidden",
+        )}
       >
         {(
           [
@@ -190,12 +256,23 @@ function LoginForm() {
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-ink-soft"
-          >
-            Password
-          </label>
+          <div className="mb-1.5 flex items-baseline justify-between gap-3">
+            <label
+              htmlFor="password"
+              className="block text-[12px] font-semibold uppercase tracking-wide text-ink-soft"
+            >
+              {isReset ? "New password" : "Password"}
+            </label>
+            {mode === "signin" && (
+              <button
+                type="button"
+                onClick={() => switchMode("reset")}
+                className="text-[12px] font-semibold text-brand-700 underline-offset-2 hover:underline"
+              >
+                Forgot password?
+              </button>
+            )}
+          </div>
           <div className="relative">
             <input
               id="password"
@@ -215,7 +292,7 @@ function LoginForm() {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {isSignup && (
+          {choosesPassword && (
             <p className="mt-1.5 text-[11px] text-ink-soft">
               At least 6 characters.
             </p>
@@ -223,7 +300,7 @@ function LoginForm() {
         </div>
 
         {/* Typos are unrecoverable without email resets, so confirm on signup. */}
-        {isSignup && (
+        {choosesPassword && (
           <div>
             <label
               htmlFor="confirm"
@@ -257,8 +334,14 @@ function LoginForm() {
           {submitting ? (
             <>
               <Loader2 size={16} className="animate-spin" />
-              {isSignup ? "Creating account…" : "Signing in…"}
+              {isReset
+                ? "Resetting…"
+                : isSignup
+                  ? "Creating account…"
+                  : "Signing in…"}
             </>
+          ) : isReset ? (
+            "Reset password"
           ) : isSignup ? (
             "Create account"
           ) : (
@@ -268,7 +351,18 @@ function LoginForm() {
       </form>
 
       <p className="mt-5 text-center text-[12px] text-ink-soft">
-        {isSignup ? (
+        {isReset ? (
+          <>
+            Remembered it?{" "}
+            <button
+              type="button"
+              onClick={() => switchMode("signin")}
+              className="font-semibold text-brand-700 underline-offset-2 hover:underline"
+            >
+              Back to sign in
+            </button>
+          </>
+        ) : isSignup ? (
           <>
             Already have an account?{" "}
             <button

@@ -7,6 +7,12 @@
  * sign in with it immediately; nothing else about the account changes (approval
  * state, reports, profile row all stay as they are).
  *
+ * That is the difference from the in-app "Forgot password?" flow, which anyone
+ * can trigger and which therefore revokes approval until an admin vouches for
+ * the request (app/api/password-reset/route.ts). Running this script *is* an
+ * admin vouching, so it leaves approval alone — and it stays the way back in
+ * when an admin locks themselves out.
+ *
  *   # Set a specific password:
  *   NEW_PASSWORD='whatever-they-picked' \
  *   npx tsx --tsconfig tsconfig.script.json scripts/set-password.mts someone@askmario.com
@@ -22,7 +28,7 @@
  */
 import { readFileSync, existsSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient, findUserIdByEmail } from "../lib/supabase/admin";
 
 /* ------------------------------------------------------------- tiny .env load */
 
@@ -57,18 +63,6 @@ if (!email) {
   );
 }
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const secretKey =
-  process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!url) fail("NEXT_PUBLIC_SUPABASE_URL is not set.");
-if (!secretKey) {
-  fail(
-    "SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) is not set — find it in\n" +
-      "  Supabase → Project Settings → API keys. It bypasses RLS, so never commit it.",
-  );
-}
-
 /**
  * Generated passwords avoid look-alike characters (0/O, 1/l/I): these get read
  * out loud or retyped from a chat message, and a transcription slip looks
@@ -80,33 +74,11 @@ function generatePassword(): string {
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }
 
-const supabase = createClient(url, secretKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
-
-/**
- * There is no admin "get user by email", only a paged list — so walk the pages
- * until the address turns up. An internal tool's user table is small enough
- * that this is one request in practice.
- */
-async function findUserId(target: string): Promise<string | null> {
-  const wanted = target.trim().toLowerCase();
-
-  for (let page = 1; page <= 20; page++) {
-    const { data, error } = await supabase.auth.admin.listUsers({
-      page,
-      perPage: 200,
-    });
-    if (error) throw new Error(`Could not list users: ${error.message}`);
-
-    const hit = data.users.find((u) => u.email?.toLowerCase() === wanted);
-    if (hit) return hit.id;
-    if (data.users.length < 200) return null; // last page
-  }
-  return null;
-}
-
 async function main() {
+  // Constructed here, not at module scope: the .env loader above only runs after
+  // the imports are evaluated, so reading the key any earlier would miss it.
+  const supabase = createAdminClient();
+
   const provided = process.env.NEW_PASSWORD;
   const generated = provided === undefined;
   const password = provided ?? generatePassword();
@@ -116,7 +88,7 @@ async function main() {
     throw new Error("NEW_PASSWORD must be at least 6 characters.");
   }
 
-  const userId = await findUserId(email!);
+  const userId = await findUserIdByEmail(supabase, email!);
 
   if (!userId) {
     throw new Error(
