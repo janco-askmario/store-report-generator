@@ -19,6 +19,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-04-live-preview-panel",
+    date: "2026-08-04",
+    title: "The preview is live now",
+    items: [
+      "Preview no longer throws the PDF into a new tab. It opens a panel down the right-hand side of the editor and the form moves over to make room, so you can type and watch the page you are making at the same time.",
+      "It redraws itself a moment after you stop typing — no button to press — and keeps your place on the page while it does, so editing something on page three doesn't fling you back to the cover.",
+      "Drag the panel's left edge to make it as wide as you like; it remembers the size on this computer. Buttons in its header still open the PDF in a tab or download it.",
+      "On a narrow window it slides over the editor instead of pushing it, the same way the team panel does.",
+    ],
+  },
+  {
     id: "2026-08-04-team-panel-push",
     date: "2026-08-04",
     title: "The team panel is part of the page now",

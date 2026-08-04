@@ -130,9 +130,27 @@ across browsers and devices instead of living in one browser's `localStorage`.
   "standout" border (default green). Tick a **Bad** block to soften it to an
   orange "improvable" border (default red).
 - **PDF** (`components/pdf/ReportDocument.tsx`) — built with
-  `@react-pdf/renderer`. Generated in the browser on **Preview** / **Generate
-  PDF**; the library is dynamically imported so it never bloats the initial
-  page load.
+  `@react-pdf/renderer`, in the browser, via `components/pdf/render.tsx`. The
+  renderer and the document are dynamically imported there, so a session that
+  never asks for a PDF never loads either.
+- **Live preview** (`components/PreviewSidebar.tsx`, `components/PdfPreview.tsx`,
+  `lib/usePdfPreview.ts`) — **Preview** in the editor opens a panel down the
+  right-hand side, built to the same shape as the team drawer: it takes real
+  width and the form re-wraps into what is left, reverting to an overlay below
+  `xl`. Unlike the team drawer it is resizable (drag its left edge; the width
+  lives in `localStorage` under `preview-panel-width`, the open state under
+  `preview-panel`) and it starts **closed** — rendering a three-page PDF on every
+  pause in typing is not work to do for someone who never opened it.
+
+  `usePdfPreview` re-renders `QUIET_MS` (700ms) after the last edit and only
+  while the panel is open, keeping the previous document on screen while the
+  next one builds. `PdfPreview` draws the pages onto canvases with **pdf.js**
+  rather than handing a blob URL to an `<iframe>`: a new blob means a new `src`
+  and a viewer that reloads to the top of page one, which is unusable when it
+  happens every time you stop typing. Drawing the pages ourselves is what keeps
+  the scroll position across an update and swaps all three pages in at once
+  instead of flashing an empty panel. If pdf.js or its worker fails to load, the
+  panel falls back to the iframe viewer — worse live behaviour, still a preview.
 - **Icons** (`lib/icons.ts`) — one shared definition set drives both the
   dashboard picker and the PDF, so a block's icon always matches.
 - **Dev test data** (`lib/dev-seed.ts`) — click the AskMario logo in the library
