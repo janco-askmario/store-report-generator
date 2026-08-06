@@ -63,6 +63,26 @@ const STAR_SIZE = 11.5;
 const STAR_GAP = 5;
 const STAR_ROW_H = STAR_SIZE + STAR_GAP;
 
+/**
+ * Space below the last element on a page. Sized to match the gaps *between*
+ * elements (8–16pt) rather than the wider margin a paper page would want —
+ * these pages are cut to their content, so a deep foot just reads as a mistake.
+ * The estimator adds the same number, so the two can never drift apart.
+ */
+const PAGE_BOTTOM = 10;
+
+/**
+ * Insurance on top of the estimate. Text height is counted from characters, so
+ * a page can render a little taller than predicted; if the page is shorter than
+ * its content, the last element is pushed onto a page of its own — much worse
+ * than a few points of tail. Sized at roughly one line of body copy, which is
+ * the granularity any miss would come in.
+ *
+ * Measured against the fixture set (short, long, formatted, wide-glyph and
+ * all-caps reports) the estimate runs 2–6pt over, so this is genuinely spare.
+ */
+const SAFETY = 8;
+
 /* --------------------------------------------------------------- palette */
 const C = {
   beige: "#e8e5d6",
@@ -106,7 +126,7 @@ const s = StyleSheet.create({
     fontSize: 8.5,
     color: C.ink,
     backgroundColor: C.beige,
-    paddingBottom: 24,
+    paddingBottom: PAGE_BOTTOM,
   },
 
   /* page-1 green header band */
@@ -621,7 +641,7 @@ function estimateHeights(data: ReportData): [number, number, number] {
     h1 +=
       16 + SECTION_H + estBox(data.goodCustom, fitBody(data.goodCustom));
   h1 += 50 + estBox(data.foodForThought, fitBody(data.foodForThought), { sub: true });
-  h1 += 24;
+  h1 += PAGE_BOTTOM;
 
   // ---- Page 2
   let h2 = 26 + SECTION_H + estGrid(bad, 26);
@@ -637,7 +657,7 @@ function estimateHeights(data: ReportData): [number, number, number] {
   h2 += BOX_CHROME_H + (12.5 * 1.25 + 5) + rulesH; // golden rules box
   h2 += BAR_H; // "directly affect the bottom line" bar
   h2 += estBox(GOLDEN_RULES_CLOSER_2, 8.5, { heading: false }); // body only
-  h2 += 24;
+  h2 += PAGE_BOTTOM;
 
   // ---- Page 3
   const actions = parseActionItems(data.actionPlan);
@@ -667,7 +687,7 @@ function estimateHeights(data: ReportData): [number, number, number] {
   );
   h3 += BOX_CHROME_H + (12.5 * 1.25 + 5) + (10 * 1.25 + 6) + actionsH; // action box
   h3 += BAR_H; // closing bar
-  h3 += 24;
+  h3 += PAGE_BOTTOM;
 
   /*
    * Each h already carries the page's own 24pt bottom padding, so a perfect
@@ -681,7 +701,7 @@ function estimateHeights(data: ReportData): [number, number, number] {
    * the worst under-prediction measured across the fixture set (short, long,
    * formatted, and deliberately wide-glyph reports) with room to spare.
    */
-  const clamp = (h: number) => Math.round(Math.max(420, h + 12));
+  const clamp = (h: number) => Math.round(Math.max(420, h + SAFETY));
   return [clamp(h1), clamp(h2), clamp(h3)];
 }
 
