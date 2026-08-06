@@ -4,6 +4,7 @@ import type { HTMLAttributes } from "react";
 import { BookmarkPlus, Check, GripVertical, Trash2 } from "lucide-react";
 import type * as Y from "yjs";
 import type { Block } from "@/lib/types";
+import { shapeForKind } from "@/lib/rating-glyphs";
 import { CollabInput, RichTextArea } from "./CollabField";
 import { IconPicker } from "./IconPicker";
 import { StarRating } from "./StarRating";
@@ -110,6 +111,7 @@ export function BlockEditor({
             onChange={(rating) => onChange({ rating })}
             color={tone.star}
             label={tone.ratingLabel}
+            shape={shapeForKind(kind)}
           />
         </div>
 

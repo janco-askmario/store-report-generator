@@ -37,6 +37,7 @@ import {
 } from "@/lib/templates";
 import { getIcon } from "@/lib/icons";
 import { bulletize, parseInline, toPlain } from "@/lib/richtext";
+import { type RatingShape, ratingGlyph, shapeForKind } from "@/lib/rating-glyphs";
 import { PdfIcon } from "./PdfIcon";
 
 // Register fonts at module load (before any render). In the browser this uses
@@ -635,22 +636,30 @@ function RichRuns({ text }: { text: string }) {
   );
 }
 
-/* ------------------------------------------------------------ star rating */
-// Same glyph as the editor's StarRating, so a 4-star block looks the same in
-// both places.
-const STAR_D =
-  "M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.563.563 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z";
-
-function StarRow({ rating, color }: { rating: number; color: string }) {
+/* ---------------------------------------------------------- block rating */
+/**
+ * The rating the block was given in the editor, in the same glyph the editor
+ * shows: stars for a strength, thumbs-down for a problem's severity.
+ */
+function RatingRow({
+  rating,
+  color,
+  shape,
+}: {
+  rating: number;
+  color: string;
+  shape: RatingShape;
+}) {
   // An unrated block in a rated section keeps the space, so the outlines below
   // it still line up with its neighbours'.
   if (!rating) return <View style={[s.starRow, { height: STAR_SIZE }]} />;
+  const d = ratingGlyph(shape);
   return (
     <View style={s.starRow}>
       {[0, 1, 2, 3, 4].map((i) => (
         <View key={i} style={{ marginHorizontal: 1 }}>
           <Svg width={STAR_SIZE} height={STAR_SIZE} viewBox="0 0 24 24">
-            <Path d={STAR_D} fill={i < rating ? color : C.muted} />
+            <Path d={d} fill={i < rating ? color : C.muted} />
           </Svg>
         </View>
       ))}
@@ -717,10 +726,12 @@ function ContentBlock({
   block,
   color,
   showStars,
+  shape,
 }: {
   block: Block;
   color: string;
   showStars: boolean;
+  shape: RatingShape;
 }) {
   return (
     <View style={[s.blockWrap, { flexGrow: 1 }]} wrap={false}>
@@ -756,8 +767,9 @@ function ContentBlock({
           )}
         </View>
       </View>
-      {/* The rating the block was given in the editor, under its own block. */}
-      {showStars ? <StarRow rating={block.rating} color={color} /> : null}
+      {showStars ? (
+        <RatingRow rating={block.rating} color={color} shape={shape} />
+      ) : null}
       <View style={s.circleOverlay}>
         <View style={[s.circle, { backgroundColor: color }]}>
           <PdfIcon
@@ -799,6 +811,7 @@ function BlockGrid({
                 block={b}
                 color={kind === "good" ? goodColor(b) : badColor(b)}
                 showStars={stars}
+                shape={shapeForKind(kind)}
               />
             </View>
           ))}

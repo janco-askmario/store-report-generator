@@ -1,16 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { type RatingShape, ratingGlyph } from "@/lib/rating-glyphs";
 import { cx } from "./ui";
 
-const STAR_D =
-  "M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.563.563 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z";
-
-function Star({ filled, color, size }: { filled: boolean; color: string; size: number }) {
+function Glyph({
+  shape,
+  filled,
+  color,
+  size,
+}: {
+  shape: RatingShape;
+  filled: boolean;
+  color: string;
+  size: number;
+}) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
       <path
-        d={STAR_D}
+        d={ratingGlyph(shape)}
         fill={filled ? color : "#e6e1f0"}
         stroke={filled ? color : "#d7d0e6"}
         strokeWidth={filled ? 0 : 1}
@@ -20,18 +28,25 @@ function Star({ filled, color, size }: { filled: boolean; color: string; size: n
   );
 }
 
+/**
+ * The 0–5 rating control on a block. Quality is rated in stars; severity on a
+ * bad block is rated in thumbs-down, because five stars on a problem reads as
+ * praise. Same glyphs the PDF uses — see lib/rating-glyphs.ts.
+ */
 export function StarRating({
   value,
   onChange,
   color = "#f5a524",
   size = 20,
   label,
+  shape = "star",
 }: {
   value: number;
   onChange: (n: number) => void;
   color?: string;
   size?: number;
   label?: string;
+  shape?: RatingShape;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const active = hover ?? value;
@@ -53,12 +68,12 @@ export function StarRating({
             type="button"
             role="radio"
             aria-checked={value === i}
-            aria-label={`${i} star${i > 1 ? "s" : ""}`}
+            aria-label={`${i} out of 5`}
             onMouseEnter={() => setHover(i)}
             onClick={() => onChange(value === i ? 0 : i)}
             className="rounded transition-transform hover:scale-110"
           >
-            <Star filled={i <= active} color={color} size={size} />
+            <Glyph shape={shape} filled={i <= active} color={color} size={size} />
           </button>
         ))}
       </div>
