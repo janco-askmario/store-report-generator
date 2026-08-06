@@ -75,13 +75,11 @@ const PAGE_BOTTOM = 10;
  * Insurance on top of the estimate. Text height is counted from characters, so
  * a page can render a little taller than predicted; if the page is shorter than
  * its content, the last element is pushed onto a page of its own — much worse
- * than a few points of tail. Sized at roughly one line of body copy, which is
- * the granularity any miss would come in.
- *
- * Measured against the fixture set (short, long, formatted, wide-glyph and
- * all-caps reports) the estimate runs 2–6pt over, so this is genuinely spare.
+ * than a few points of tail. Sized generously (a few lines of body copy) since
+ * a bit of empty tail is far cheaper than a block silently spilling onto an
+ * orphan page.
  */
-const SAFETY = 8;
+const SAFETY = 26;
 
 /* --------------------------------------------------------------- palette */
 const C = {
@@ -396,61 +394,61 @@ function fitFill(text: string): number {
   return fitStep(
     text.length,
     [
-      [160, 6.8],
-      [240, 6.2],
-      [340, 5.7],
-      [460, 5.3],
-      [620, 4.9],
+      [160, 8],
+      [240, 7.4],
+      [340, 6.9],
+      [460, 6.5],
+      [620, 6.1],
     ],
-    4.5,
+    5.8,
   );
 }
 function fitTitle(text: string): number {
   return fitStep(
     text.length,
     [
-      [30, 8],
-      [44, 7.4],
-      [60, 6.8],
+      [30, 9],
+      [44, 8.4],
+      [60, 7.8],
     ],
-    6.2,
+    7.2,
   );
 }
 function fitBody(text: string): number {
   return fitStep(
     text.length,
     [
-      [320, 8.5],
-      [640, 8],
-      [1000, 7.4],
-      [1500, 6.9],
-      [2200, 6.4],
+      [320, 9.5],
+      [640, 9],
+      [1000, 8.4],
+      [1500, 7.8],
+      [2200, 7.3],
     ],
-    5.8,
+    6.9,
   );
 }
 function fitMetricValue(v: string): number {
   return fitStep(
     v.length,
     [
-      [6, 12],
-      [9, 10.5],
-      [12, 9],
+      [6, 13],
+      [9, 11.5],
+      [12, 10],
     ],
-    8,
+    9,
   );
 }
 function fitActions(text: string): number {
   return fitStep(
     text.length,
     [
-      [700, 8.5],
-      [1100, 8],
-      [1600, 7.4],
-      [2200, 6.9],
-      [3000, 6.4],
+      [700, 9.5],
+      [1100, 9],
+      [1600, 8.4],
+      [2200, 7.8],
+      [3000, 7.3],
     ],
-    5.8,
+    6.9,
   );
 }
 
@@ -473,11 +471,11 @@ const SECTION_H = 20 + 12; // header line + marginBottom (marginTop added by cal
 
 /**
  * Average character width as a fraction of font size, for body copy in the
- * green panels. Calibrated against rendered output: too high and every page
- * carries a tail of dead space, too low and the last element is pushed onto a
- * page of its own.
+ * green panels. Calibrated against rendered output, biased conservative (a
+ * little dead space at the page tail) rather than tight: undercounting here
+ * is what pushes the last element onto an orphan page of its own.
  */
-const BOX_CF = 0.5;
+const BOX_CF = 0.56;
 
 /**
  * Rendered lines a string will take at `font` in `width`.
