@@ -451,19 +451,66 @@ const BOX_W = CONTENT_W - BLOCK_BORDER * 2 - 28;
 const BOX_CHROME_H = 8 + BLOCK_BORDER * 2 + 22;
 const SECTION_H = 20 + 12; // header line + marginBottom (marginTop added by caller)
 
+/**
+ * Average character width as a fraction of font size, for body copy in the
+ * green panels. Calibrated against rendered output: too high and every page
+ * carries a tail of dead space, too low and the last element is pushed onto a
+ * page of its own.
+ */
+const BOX_CF = 0.5;
+
+/**
+ * Rendered lines a string will take at `font` in `width`.
+ *
+ * `hardBreaks` is not a detail: a bulleted list is one paragraph containing
+ * single newlines, and where those newlines survive to the page (block fills
+ * and action items) each one starts a line. The green panels are the exception
+ * — `Paragraphs` collapses single newlines to spaces before rendering, so
+ * counting them there would invent lines that never appear.
+ */
+/**
+ * Capitals are roughly a third wider than lowercase in Montserrat, so a line of
+ * SHOUTED COPY fits far fewer characters than the same count of prose. Without
+ * this, an all-caps passage is under-measured and its last line is pushed onto
+ * a page of its own.
+ */
+function charFactor(text: string, base: number): number {
+  const letters = text.replace(/[^A-Za-z]/g, "");
+  const caps = letters
+    ? (letters.match(/[A-Z]/g) ?? []).length / letters.length
+    : 0;
+  // Anything outside ASCII is assumed wider than a Latin letter rather than
+  // narrower — accented copy is close, CJK is roughly double, and guessing low
+  // here is the expensive direction.
+  const wide = text
+    ? (text.match(/[^\x00-\x7F]/g) ?? []).length / text.length
+    : 0;
+  return base * (1 + 0.38 * caps + 0.8 * wide);
+}
+
 function lineCount(
   text: string,
   font: number,
   width: number,
   cf = 0.55,
+  hardBreaks = false,
 ): number {
-  const cpl = Math.max(6, Math.floor(width / (font * cf)));
+  const cpl = Math.max(6, Math.floor(width / (font * charFactor(text, cf))));
+  const wrapped = (segment: string) =>
+    Math.max(1, Math.ceil(segment.trim().length / cpl));
   const paras = text
     .split(/\n{2,}/)
     .map((p) => p.trim())
     .filter(Boolean);
   if (!paras.length) return 0;
-  return paras.reduce((n, p) => n + Math.max(1, Math.ceil(p.length / cpl)), 0);
+  return paras.reduce(
+    (n, p) =>
+      n +
+      (hardBreaks
+        ? p.split("\n").reduce((m, line) => m + wrapped(line), 0)
+        : wrapped(p)),
+    0,
+  );
 }
 /** Anything drawn as a bordered block: the good/bad blocks and the metrics. */
 interface BlockLike {
@@ -478,11 +525,16 @@ interface BlockLike {
 function estBlock(b: BlockLike, topPad: number, reserveStars: boolean): number {
   const tf = fitTitle(b.title || "X");
   const titleH =
-    Math.max(1, lineCount(b.title || "X", tf, TITLE_W, 0.62)) * tf * 1.25 + 6;
+    Math.max(1, lineCount((b.title || "X").toUpperCase(), tf, TITLE_W, 0.5)) *
+      tf *
+      1.25 +
+    6;
   // Markers are formatting, not characters on the page.
   const plain = toPlain(b.paragraph);
   const ff = fitFill(plain);
-  const fillH = plain ? lineCount(plain, ff, FILL_W, 0.62) * ff * 1.35 + 12 : 0;
+  const fillH = plain
+    ? lineCount(plain, ff, FILL_W, 0.62, true) * ff * 1.35 + 12
+    : 0;
   const starsH = reserveStars ? STAR_ROW_H : 0;
   return 22 + BLOCK_BORDER * 2 + topPad + titleH + fillH + starsH;
 }
@@ -527,14 +579,31 @@ function estGrid(blocks: BlockLike[], topPad: number): number {
   const rows = Math.ceil(blocks.length / 3);
   return rows * (uniformBlockHeight(blocks, topPad) + 10);
 }
-function estBox(body: string, bodyFont: number, hasSub: boolean): number {
+/** Height of a green panel: chrome, whichever headings it has, then the body. */
+function estBox(
+  body: string,
+  bodyFont: number,
+  { heading = true, sub = false }: { heading?: boolean; sub?: boolean } = {},
+): number {
   return (
     BOX_CHROME_H +
-    (12.5 * 1.25 + 5) +
-    (hasSub ? 10 * 1.25 + 6 : 0) +
-    lineCount(body, bodyFont, BOX_W, 0.55) * bodyFont * 1.45
+    (heading ? 12.5 * 1.25 + 5 : 0) +
+    (sub ? 10 * 1.25 + 6 : 0) +
+    lineCount(body, bodyFont, BOX_W, BOX_CF) * bodyFont * 1.45 +
+    paragraphCount(body) * 5 // s.body marginBottom, one per paragraph
   );
 }
+
+/** Paragraphs are split on blank lines — see the Paragraphs component. */
+function paragraphCount(text: string): number {
+  return Math.max(
+    1,
+    text.split(/\n{2,}/).filter((p) => p.trim()).length,
+  );
+}
+
+/** A full-width green bar: marginTop + paddingVertical + one 10pt line. */
+const BAR_H = 8 + 18 + 10 * 1.25;
 
 function estimateHeights(data: ReportData): [number, number, number] {
   const good = data.goodBlocks.filter(
@@ -550,8 +619,8 @@ function estimateHeights(data: ReportData): [number, number, number] {
   h1 += 16 + SECTION_H + estGrid(good, 26);
   if (data.goodCustom.trim())
     h1 +=
-      16 + SECTION_H + estBox(data.goodCustom, fitBody(data.goodCustom), false);
-  h1 += 50 + estBox(data.foodForThought, fitBody(data.foodForThought), true);
+      16 + SECTION_H + estBox(data.goodCustom, fitBody(data.goodCustom));
+  h1 += 50 + estBox(data.foodForThought, fitBody(data.foodForThought), { sub: true });
   h1 += 24;
 
   // ---- Page 2
@@ -559,15 +628,15 @@ function estimateHeights(data: ReportData): [number, number, number] {
   const rulesH = GOLDEN_RULES.reduce(
     (n, r) =>
       n +
-      Math.max(1, lineCount(`${r.title}: ${r.body}`, 8.5, BOX_W - 16, 0.55)) *
+      Math.max(1, lineCount(`${r.title}: ${r.body}`, 8.5, BOX_W - 16, BOX_CF)) *
         8.5 *
         1.4 +
       5,
     0,
   );
   h2 += BOX_CHROME_H + (12.5 * 1.25 + 5) + rulesH; // golden rules box
-  h2 += 8 + 18 + 12.5 * 1.25; // "directly affect the bottom line" bar
-  h2 += estBox(GOLDEN_RULES_CLOSER_2, 8.5, false); // closer box (heading est adds slack)
+  h2 += BAR_H; // "directly affect the bottom line" bar
+  h2 += estBox(GOLDEN_RULES_CLOSER_2, 8.5, { heading: false }); // body only
   h2 += 24;
 
   // ---- Page 3
@@ -587,7 +656,8 @@ function estimateHeights(data: ReportData): [number, number, number] {
           `${a.title ? `${a.title}: ` : ""}${toPlain(a.body)}`,
           asz,
           BOX_W,
-          0.55,
+          BOX_CF,
+          true,
         ),
       ) *
         asz *
@@ -596,11 +666,22 @@ function estimateHeights(data: ReportData): [number, number, number] {
     0,
   );
   h3 += BOX_CHROME_H + (12.5 * 1.25 + 5) + (10 * 1.25 + 6) + actionsH; // action box
-  h3 += 8 + 18 + 12.5 * 1.25; // closing bar
+  h3 += BAR_H; // closing bar
   h3 += 24;
 
-  // Proportional safety so estimation error never overflows onto an extra page.
-  const clamp = (h: number) => Math.round(Math.max(420, h * 1.08 + 48));
+  /*
+   * Each h already carries the page's own 24pt bottom padding, so a perfect
+   * estimate would leave exactly that much below the last element — the same
+   * breathing room the elements have between them.
+   *
+   * What is left is insurance. Text height is estimated from character counts,
+   * so a page can come out a little taller than predicted; if the page is
+   * shorter than its content, the last element is pushed onto a page of its
+   * own, which is far worse than a few points of tail. The margin below covers
+   * the worst under-prediction measured across the fixture set (short, long,
+   * formatted, and deliberately wide-glyph reports) with room to spare.
+   */
+  const clamp = (h: number) => Math.round(Math.max(420, h + 12));
   return [clamp(h1), clamp(h2), clamp(h3)];
 }
 
