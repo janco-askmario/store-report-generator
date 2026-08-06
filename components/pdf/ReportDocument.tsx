@@ -37,7 +37,6 @@ import {
 } from "@/lib/templates";
 import { getIcon } from "@/lib/icons";
 import { bulletize, parseInline, toPlain } from "@/lib/richtext";
-import { type RatingShape, ratingGlyph, shapeForKind } from "@/lib/rating-glyphs";
 import { PdfIcon } from "./PdfIcon";
 
 // Register fonts at module load (before any render). In the browser this uses
@@ -57,11 +56,7 @@ const PAGE_WIDTH = 595.28;
  * Plan). All of them draw the outline as a filled layer rather than a border —
  * see `blockFrame`.
  */
-const BLOCK_BORDER = 4.3;
-/** Star strip under a rated block: glyph height plus the gap above it. */
-const STAR_SIZE = 11.5;
-const STAR_GAP = 5;
-const STAR_ROW_H = STAR_SIZE + STAR_GAP;
+const BLOCK_BORDER = 2.15;
 
 /**
  * Space below the last element on a page. Sized to match the gaps *between*
@@ -208,12 +203,6 @@ const s = StyleSheet.create({
     backgroundColor: C.beige, // the page colour, so the frame reads as an outline
     paddingTop: 26,
     paddingBottom: 0,
-  },
-  starRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: STAR_GAP,
   },
   blockTitle: {
     fontFamily: "Montserrat",
@@ -534,13 +523,12 @@ function lineCount(
 interface BlockLike {
   title: string;
   paragraph: string;
-  rating?: number;
 }
 
 // Deliberately runs a little wide (0.62 vs the 0.55-ish elsewhere): this drives
 // the shared block height, which must land *above* the tallest block — see
 // uniformBlockHeight.
-function estBlock(b: BlockLike, topPad: number, reserveStars: boolean): number {
+function estBlock(b: BlockLike, topPad: number): number {
   const tf = fitTitle(b.title || "X");
   const titleH =
     Math.max(1, lineCount((b.title || "X").toUpperCase(), tf, TITLE_W, 0.5)) *
@@ -553,19 +541,9 @@ function estBlock(b: BlockLike, topPad: number, reserveStars: boolean): number {
   const fillH = plain
     ? lineCount(plain, ff, FILL_W, 0.62, true) * ff * 1.35 + 12
     : 0;
-  const starsH = reserveStars ? STAR_ROW_H : 0;
-  return 22 + BLOCK_BORDER * 2 + topPad + titleH + fillH + starsH;
+  return 22 + BLOCK_BORDER * 2 + topPad + titleH + fillH;
 }
 
-/**
- * Whether a section shows the star strip at all. It is all or nothing per
- * section: reserving the strip for an unrated block keeps every outline the
- * same height, but reserving it when nobody rated anything would just leave a
- * gap under every block.
- */
-function showsStars(blocks: BlockLike[]): boolean {
-  return blocks.some((b) => (b.rating ?? 0) > 0);
-}
 /**
  * One height for every block in a section, taken from its wordiest block, so a
  * grid never looks ragged. react-pdf can't measure text before layout, so the
@@ -575,10 +553,7 @@ function showsStars(blocks: BlockLike[]): boolean {
  */
 function uniformBlockHeight(blocks: BlockLike[], topPad = 26): number {
   if (!blocks.length) return 0;
-  const stars = showsStars(blocks);
-  return Math.ceil(
-    Math.max(...blocks.map((b) => estBlock(b, topPad, stars))) + 4,
-  );
+  return Math.ceil(Math.max(...blocks.map((b) => estBlock(b, topPad))) + 4);
 }
 /** The metric circle is bigger than a block icon, so it needs more head room. */
 const METRIC_TOP_PAD = 46;
@@ -735,37 +710,6 @@ function RichRuns({ text }: { text: string }) {
   );
 }
 
-/* ---------------------------------------------------------- block rating */
-/**
- * The rating the block was given in the editor, in the same glyph the editor
- * shows: stars for a strength, thumbs-down for a problem's severity.
- */
-function RatingRow({
-  rating,
-  color,
-  shape,
-}: {
-  rating: number;
-  color: string;
-  shape: RatingShape;
-}) {
-  // An unrated block in a rated section keeps the space, so the outlines below
-  // it still line up with its neighbours'.
-  if (!rating) return <View style={[s.starRow, { height: STAR_SIZE }]} />;
-  const d = ratingGlyph(shape);
-  return (
-    <View style={s.starRow}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <View key={i} style={{ marginHorizontal: 1 }}>
-          <Svg width={STAR_SIZE} height={STAR_SIZE} viewBox="0 0 24 24">
-            <Path d={d} fill={i < rating ? color : C.muted} />
-          </Svg>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 /* -------------------------------------------------------------- helpers */
 /** A green-outlined panel: Notes, Food for Thought, Golden Rules, Action Plan. */
 function GreenBox({ children }: { children: ReactNode }) {
@@ -821,17 +765,7 @@ function parseActionItems(text: string) {
   });
 }
 
-function ContentBlock({
-  block,
-  color,
-  showStars,
-  shape,
-}: {
-  block: Block;
-  color: string;
-  showStars: boolean;
-  shape: RatingShape;
-}) {
+function ContentBlock({ block, color }: { block: Block; color: string }) {
   return (
     <View style={[s.blockWrap, { flexGrow: 1 }]} wrap={false}>
       <View style={[s.blockFrame, { backgroundColor: color, flexGrow: 1 }]}>
@@ -855,7 +789,10 @@ function ContentBlock({
               <Text
                 style={[
                   s.blockFillText,
-                  { fontSize: fitFill(toPlain(block.paragraph)) },
+                  {
+                    fontSize: fitFill(toPlain(block.paragraph)),
+                    color: color === C.green ? C.ink : C.white,
+                  },
                 ]}
               >
                 <RichRuns text={block.paragraph} />
@@ -866,15 +803,12 @@ function ContentBlock({
           )}
         </View>
       </View>
-      {showStars ? (
-        <RatingRow rating={block.rating} color={color} shape={shape} />
-      ) : null}
       <View style={s.circleOverlay}>
         <View style={[s.circle, { backgroundColor: color }]}>
           <PdfIcon
             name={block.icon}
             size={21}
-            color={C.ink}
+            color={color === C.purple ? C.white : C.ink}
             strokeWidth={1.8}
           />
         </View>
@@ -893,7 +827,6 @@ function BlockGrid({
   // One height for the whole section: rows stretch their columns to match each
   // other, and the shared minHeight lifts every row up to the wordiest block.
   const rowHeight = uniformBlockHeight(blocks);
-  const stars = showsStars(blocks);
   const rows: Block[][] = [];
   for (let i = 0; i < blocks.length; i += 3) rows.push(blocks.slice(i, i + 3));
 
@@ -909,8 +842,6 @@ function BlockGrid({
               <ContentBlock
                 block={b}
                 color={kind === "good" ? goodColor(b) : badColor(b)}
-                showStars={stars}
-                shape={shapeForKind(kind)}
               />
             </View>
           ))}
@@ -945,7 +876,15 @@ function MetricBlock({
                 { backgroundColor: color, flexGrow: 1, flexShrink: 0 },
               ]}
             >
-              <Text style={[s.blockFillText, { fontSize: fitFill(note) }]}>
+              <Text
+                style={[
+                  s.blockFillText,
+                  {
+                    fontSize: fitFill(note),
+                    color: color === C.green ? C.ink : C.white,
+                  },
+                ]}
+              >
                 {note}
               </Text>
             </View>
