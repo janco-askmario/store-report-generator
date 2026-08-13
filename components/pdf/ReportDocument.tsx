@@ -262,7 +262,7 @@ const s = StyleSheet.create({
     fontFamily: "Montserrat",
     fontWeight: 800,
     fontSize: 11,
-    color: C.white,
+    color: C.ink,
     textAlign: "center",
   },
 

@@ -34,6 +34,7 @@ function make(level: Exclude<Level, "none">, blurb: string): Verdict {
   return { level, ...LABEL[level], blurb };
 }
 
+/** THIS MUST BE FIXED AT SOME POINT */
 /** Conversion rate (%). Healthy ≥ 1%. */
 export function conversionVerdict(pct: number | null): Verdict {
   if (pct == null) return NONE;
