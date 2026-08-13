@@ -38,7 +38,7 @@ function make(level: Exclude<Level, "none">, blurb: string): Verdict {
 export function conversionVerdict(pct: number | null): Verdict {
   if (pct == null) return NONE;
   if (pct < 1) return make("poor", "Below the 1% healthy benchmark — converting poorly.");
-  if (pct < 2) return make("ok", "Just above the 1% benchmark — room to grow.");
+  if (pct < 2) return make("good", "Just above the 1% benchmark — room to grow.");
   if (pct < 3.5) return make("good", "A healthy conversion rate above 1%.");
   return make("great", "A standout conversion rate — well above average.");
 }
