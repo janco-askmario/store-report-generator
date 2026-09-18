@@ -19,6 +19,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-18-generate-report-questionnaire",
+    date: "2026-09-18",
+    title: "A questionnaire that fills in the first draft",
+    items: [
+      "\"New report\" now opens a choice first: start from a blank report as before, or answer a short audit questionnaire and let it build the first draft for you.",
+      "The questionnaire mirrors the same screens a review actually walks through — Analytics, Growth, Settings, the front-end, apps — with a progress bar so you always know how much is left.",
+      "Answers turn into real Good and Bad blocks and fill in the analytics numbers, using the same fixed rules and house copy as picking blocks by hand. No AI involved — it's the same report we'd write ourselves, just faster to start.",
+      "Nothing is locked in: every generated block is an ordinary block afterward, so edit, reorder or delete it exactly like you would any other.",
+    ],
+  },
+  {
     id: "2026-08-04-live-preview-panel",
     date: "2026-08-04",
     title: "The preview is live now",
