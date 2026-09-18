@@ -62,18 +62,38 @@ function fromRow(row: ReportRow): StoredReport {
   };
 }
 
+/**
+ * `getSession()` reads the already-verified session from local storage —
+ * `getUser()` always makes a network round trip to re-validate the JWT
+ * against Supabase Auth, which is unnecessary here: we just need the id of
+ * whoever the middleware already let through.
+ */
 async function currentUserId(): Promise<string | null> {
-  const { data } = await createClient().auth.getUser();
-  return data.user?.id ?? null;
+  const { data } = await createClient().auth.getSession();
+  return data.session?.user?.id ?? null;
 }
 
 /* ------------------------------------------------------------------- API */
+
+/**
+ * Every row's full `data` blob (every block's text, all analytics fields,
+ * an embedded logo) is fetched here, not the page-worth the library actually
+ * displays. That's deliberate, not an oversight: search and the "health"
+ * sort are computed client-side over every row (`ReportsLibrary`'s `visible`
+ * memo, `computeHealth`), so a server-side `.range()` here would silently
+ * make both page-scoped instead of library-wide — a real behaviour change,
+ * not just a perf tweak, and one that needs sign-off rather than a drive-by
+ * fix. This `.limit()` only bounds the worst case (unbounded growth over
+ * years) without changing today's search/sort behaviour.
+ */
+const LIST_HARD_CAP = 1000;
 
 export async function listReports(): Promise<StoredReport[]> {
   const { data, error } = await createClient()
     .from(TABLE)
     .select("id, created_at, updated_at, data")
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(LIST_HARD_CAP);
 
   if (error) {
     console.error("listReports failed:", error.message);
@@ -96,6 +116,27 @@ export async function getReport(id: string): Promise<StoredReport | undefined> {
   return data ? fromRow(data as ReportRow) : undefined;
 }
 
+/**
+ * A just-created report's row, held only long enough for the editor's first
+ * connect (`ReportCollabProvider.bootstrap`) to pick it up instead of
+ * re-fetching the exact row this request already returned.
+ *
+ * Plain in-memory state, not persistence: `router.push` is a client-side
+ * transition in this app, so the module stays alive across it, but a direct
+ * link, a refresh, or a second tab all still work correctly — they just fall
+ * through to the normal network fetch. Read-once (`takeFreshReport` deletes
+ * on read) so a stale entry can never be served twice; entries are small and
+ * bounded by how many reports one person creates without opening them in the
+ * same session, so no eviction beyond that is needed.
+ */
+const freshReports = new Map<string, ReportData>();
+
+export function takeFreshReport(id: string): ReportData | undefined {
+  const data = freshReports.get(id);
+  freshReports.delete(id);
+  return data;
+}
+
 export async function createReport(
   data?: ReportData,
 ): Promise<StoredReport | undefined> {
@@ -112,7 +153,9 @@ export async function createReport(
     console.error("createReport failed:", error.message);
     return undefined;
   }
-  return fromRow(row as ReportRow);
+  const report = fromRow(row as ReportRow);
+  freshReports.set(report.id, report.data);
+  return report;
 }
 
 /** Update a report's body; returns false if the write failed. */

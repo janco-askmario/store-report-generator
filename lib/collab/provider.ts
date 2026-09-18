@@ -1,7 +1,7 @@
 import * as Y from "yjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import { getReport, saveReportData } from "@/lib/store";
+import { getReport, saveReportData, takeFreshReport } from "@/lib/store";
 import { SEED_ORIGIN, docToReportData, isEmptyDoc, seedDoc } from "./doc";
 
 export type CollabStatus = "connecting" | "ready" | "missing" | "error";
@@ -183,15 +183,19 @@ export class ReportCollabProvider {
    * with no clean way to undo it.
    */
   private async bootstrap(): Promise<boolean> {
-    const report = await getReport(this.reportId);
+    // A report just created by this same browser tab hands its data off
+    // here directly — router.push is a client-side transition, so the stash
+    // is still there — instead of re-fetching the row we just wrote.
+    const fresh = takeFreshReport(this.reportId);
+    const reportData = fresh ?? (await getReport(this.reportId))?.data;
     if (this.destroyed) return false;
-    if (!report) {
+    if (!reportData) {
       this.onStatus?.("missing");
       return false;
     }
 
     const scratch = new Y.Doc();
-    seedDoc(scratch, report.data);
+    seedDoc(scratch, reportData);
     const seed = Y.encodeStateAsUpdate(scratch);
     scratch.destroy();
 
