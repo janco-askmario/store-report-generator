@@ -33,7 +33,7 @@ export interface BlockTemplate {
  * as a line break but is not counted, so every block would under-measure by a
  * line and long sections would quietly overflow their box.
  */
-function body(...parts: string[]): string {
+export function body(...parts: string[]): string {
   return parts.join("\n\n");
 }
 
@@ -162,6 +162,11 @@ export const BUILTIN_TEMPLATES: BlockTemplate[] = HOUSE_TEMPLATES.map((t) => ({
   ...t,
   builtin: true,
 }));
+
+/** Look up a house template by id — e.g. reused verbatim by the questionnaire generator. */
+export const BUILTIN_BY_ID: Record<string, BlockTemplate> = Object.fromEntries(
+  BUILTIN_TEMPLATES.map((t) => [t.id, t]),
+);
 
 /* ------------------------------------------------------ saved templates */
 
