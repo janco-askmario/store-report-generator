@@ -403,6 +403,7 @@ function QuestionField({
       placeholder={question.placeholder}
       prefix={question.prefix}
       suffix={question.suffix}
+      type={question.type === "date" ? "date" : "text"}
       inputMode={question.type === "number" ? "decimal" : "text"}
     />
   );
