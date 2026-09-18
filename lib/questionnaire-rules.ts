@@ -79,27 +79,13 @@ export function buildReportFromAnswers(answers: Answers): ReportData {
   const list: BlockList = { good: [], bad: [] };
 
   /* ------------------------------------------------------------- Overview */
-  if (yes(answers, "ytdGrowth")) {
-    good(
-      list,
-      "Strong Year-on-Year Growth",
-      body(
-        "Year-to-Date performance is trending up on the same period last year — the store is growing, not just holding steady.",
-        "That's the trend line every other fix in this report builds on.",
-      ),
-      "trending-up",
-    );
-  } else if (no(answers, "ytdGrowth")) {
-    badBlock(
-      list,
-      "Year-on-Year Decline",
-      body(
-        "Year-to-Date performance is down on the same period last year. Before touching the front-end, it's worth understanding whether this is a traffic problem, a conversion problem, or both.",
-        "Fix the trend line first — everything else compounds on top of it.",
-      ),
-      "trending-down",
-    );
-  }
+  // Both are optional — an empty answer keeps createInitialData()'s defaults
+  // (blank start date, reportDate defaulted to today) rather than blanking
+  // out a sensible default.
+  const startDate = s(answers, "startDate");
+  if (startDate) data.startDate = startDate;
+  const reportDate = s(answers, "reportDate");
+  if (reportDate) data.reportDate = reportDate;
 
   if (yes(answers, "fastSite")) {
     good(
@@ -133,28 +119,6 @@ export function buildReportFromAnswers(answers: Answers): ReportData {
   data.analytics.addedToCart = s(answers, "addedToCart");
   data.analytics.mobileSessions = s(answers, "mobileSessions");
   data.analytics.desktopSessions = s(answers, "desktopSessions");
-
-  if (yes(answers, "salesTrendHealthy")) {
-    good(
-      list,
-      "Consistent Sales Momentum",
-      body(
-        "Total Sales Over Time shows a steady, growing line rather than a spike-and-crash pattern — a sign that demand isn't purely reliant on promotions.",
-        "That consistency makes every other change easier to measure.",
-      ),
-      "chart-column",
-    );
-  } else if (no(answers, "salesTrendHealthy")) {
-    badBlock(
-      list,
-      "Volatile Sales Trend",
-      body(
-        "Total Sales Over Time is spiky or trending down rather than building steadily. That usually points to a reliance on discounting or one-off pushes rather than a repeatable engine.",
-        "Smooth the peaks and troughs before pouring more traffic on top.",
-      ),
-      "trending-down",
-    );
-  }
 
   const orders = n(answers, "ordersMade");
   const fulfilled = n(answers, "ordersFulfilled");
@@ -210,28 +174,6 @@ export function buildReportFromAnswers(answers: Answers): ReportData {
   }
 
   /* --------------------------------------------------------------- Traffic */
-  if (yes(answers, "sessionsTrendHealthy")) {
-    good(
-      list,
-      "Growing Traffic Trend",
-      body(
-        "Sessions Over Time is trending up or holding steady — the top of the funnel isn't the problem here.",
-        "That gives every conversion fix below room to actually move the needle.",
-      ),
-      "globe",
-    );
-  } else if (no(answers, "sessionsTrendHealthy")) {
-    badBlock(
-      list,
-      "Declining Traffic Trend",
-      body(
-        "Sessions Over Time is trending down. Before optimising the store further, the traffic tap itself needs attention — no amount of on-site polish fixes an empty room.",
-        "Pair this with the traffic-source check below before deciding where to spend.",
-      ),
-      "trending-down",
-    );
-  }
-
   const addedToCart = n(answers, "addedToCart");
   const reachedCheckout = n(answers, "reachedCheckout");
   if (addedToCart && orders !== undefined) {
@@ -267,6 +209,24 @@ export function buildReportFromAnswers(answers: Answers): ReportData {
         "credit-card",
       );
     }
+  }
+
+  const desktopSessions = n(answers, "desktopSessions");
+  const mobileSessions = n(answers, "mobileSessions");
+  const tabletSessions = n(answers, "tabletSessions");
+  if (
+    desktopSessions !== undefined ||
+    mobileSessions !== undefined ||
+    tabletSessions !== undefined
+  ) {
+    const d = desktopSessions || 0;
+    const m = mobileSessions || 0;
+    const t = tabletSessions || 0;
+    // Desktop vs. mobile is the only split with house copy either way — a
+    // tablet-led split is unusual enough that we'd rather stay quiet than
+    // force a weak block onto it.
+    if (d > m && d > t) reuseGood(list, "builtin:desktop-majority");
+    else if (m > d && m > t) reuseGood(list, "builtin:mobile-majority");
   }
 
   if (yes(answers, "locationConcentrated")) {

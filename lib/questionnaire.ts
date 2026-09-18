@@ -12,7 +12,8 @@
  * pre-written Good or Bad block. A handful need a real value instead — a
  * number that gets graded against a benchmark (Returning Customer Rate, AOV)
  * or that also populates the report's own analytics fields (Gross Sales,
- * Orders), and a couple of free-text fields (best-selling product, theme name).
+ * Orders), a couple of free-text fields (best-selling product, theme name),
+ * and the two dates that set the report's own reporting period.
  *
  * Some numeric answers (Reached Checkout, social follower count, Returning
  * Customer Rate) have nowhere to live in `ReportData` — the app doesn't track
@@ -20,7 +21,7 @@
  * otherwise discarded. Their hints say so.
  */
 
-export type QuestionType = "boolean" | "text" | "number";
+export type QuestionType = "boolean" | "text" | "number" | "date";
 
 export type Answers = Record<string, string | boolean | undefined>;
 
@@ -61,16 +62,22 @@ function text(id: string, label: string, extra: Partial<Question> = {}): Questio
   return { id, type: "text", label, ...extra };
 }
 
+function date(id: string, label: string, extra: Partial<Question> = {}): Question {
+  return { id, type: "date", label, ...extra };
+}
+
 export const QUESTIONNAIRE: QuestionnaireStep[] = [
   {
     id: "overview",
     title: "Overview",
     description: "The big picture before we get into the numbers.",
     questions: [
-      bool(
-        "ytdGrowth",
-        "Is Year-to-Date performance trending up on the prior period?",
-      ),
+      date("startDate", "Start date", {
+        hint: "Beginning of the reporting period.",
+      }),
+      date("reportDate", "Report date", {
+        hint: "End of the reporting period — defaults to today if left blank.",
+      }),
       bool("fastSite", "Does the store load quickly (LCP under ~2.5s)?", {
         hint: "Website Speed report / PageSpeed Insights.",
       }),
@@ -91,10 +98,6 @@ export const QUESTIONNAIRE: QuestionnaireStep[] = [
       text("bestSellingProduct", "Best-selling product", {
         placeholder: "e.g. Classic Tote Bag",
       }),
-      bool(
-        "salesTrendHealthy",
-        "Is Total Sales Over Time steady or growing, not sharply declining?",
-      ),
     ],
   },
   {
@@ -102,10 +105,6 @@ export const QUESTIONNAIRE: QuestionnaireStep[] = [
     title: "Traffic & Conversion",
     description: "Sessions, conversion and where visitors are coming from.",
     questions: [
-      bool(
-        "sessionsTrendHealthy",
-        "Is Sessions Over Time steady or growing?",
-      ),
       num("conversionRate", "Conversion rate", {
         suffix: "%",
         hint: "1% and higher is healthy.",
@@ -114,8 +113,11 @@ export const QUESTIONNAIRE: QuestionnaireStep[] = [
       num("reachedCheckout", "Sessions that reached checkout", {
         hint: "Used to tailor the checkout block — not stored elsewhere in the report.",
       }),
-      num("mobileSessions", "Mobile sessions"),
       num("desktopSessions", "Desktop sessions"),
+      num("mobileSessions", "Mobile sessions"),
+      num("tabletSessions", "Tablet sessions", {
+        hint: "Used to tailor the device block — not stored elsewhere in the report.",
+      }),
       bool(
         "locationConcentrated",
         "Is traffic concentrated in the store's target market?",
