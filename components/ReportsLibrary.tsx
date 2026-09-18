@@ -175,9 +175,13 @@ export function ReportsLibrary() {
   useEffect(() => {
     refresh();
     setLegacyCount(readLegacyReports().length);
+    // getSession() reads the already-verified session locally — middleware
+    // has already validated it for this navigation, so re-checking with
+    // getUser() would just be a second network round trip for an email
+    // address.
     createClient()
-      .auth.getUser()
-      .then(({ data }) => setEmail(data.user?.email ?? null));
+      .auth.getSession()
+      .then(({ data }) => setEmail(data.session?.user?.email ?? null));
   }, []);
 
   /*
