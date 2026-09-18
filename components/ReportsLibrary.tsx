@@ -20,7 +20,7 @@ import {
   Store,
   Trash2,
 } from "lucide-react";
-import type { StoredReport } from "@/lib/types";
+import type { ReportData, StoredReport } from "@/lib/types";
 import {
   clearLegacyReports,
   createReport,
@@ -44,6 +44,7 @@ import { type PresentUser, usePresence } from "@/lib/presence";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
 import { TeamSidebar, TeamSidebarToggle } from "@/components/TeamSidebar";
 import { WhatsNew } from "@/components/WhatsNew";
+import { GenerateReportModal } from "@/components/GenerateReportModal";
 import { cx } from "@/components/ui";
 
 function fmtDate(ts: number): string {
@@ -213,8 +214,16 @@ export function ReportsLibrary() {
     };
   }, []);
 
-  const onNew = async () => {
+  const [newModalOpen, setNewModalOpen] = useState(false);
+  const onNew = () => setNewModalOpen(true);
+
+  const onScratch = async () => {
     const r = await createReport();
+    if (r) router.push(`/report/${r.id}`);
+    else alert("Could not create the report. Check your connection and retry.");
+  };
+  const onGenerate = async (data: ReportData) => {
+    const r = await createReport(data);
     if (r) router.push(`/report/${r.id}`);
     else alert("Could not create the report. Check your connection and retry.");
   };
@@ -562,6 +571,13 @@ export function ReportsLibrary() {
           </div>
         )}
       </div>
+
+      <GenerateReportModal
+        open={newModalOpen}
+        onClose={() => setNewModalOpen(false)}
+        onScratch={onScratch}
+        onGenerate={onGenerate}
+      />
     </TeamSidebar>
   );
 }
