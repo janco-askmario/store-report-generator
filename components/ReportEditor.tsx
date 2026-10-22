@@ -28,7 +28,6 @@ import {
   CloudOff,
   Eraser,
   FileText,
-  Gauge,
   Image as ImageIcon,
   ListChecks,
   Loader2,
@@ -59,7 +58,6 @@ import {
   formatPct,
   num,
 } from "@/lib/calc";
-import { computeHealth } from "@/lib/scoring";
 import {
   addToCartVerdict,
   aovVerdict,
@@ -85,7 +83,6 @@ import {
   Field,
   Label,
   MetricPill,
-  ScoreRing,
   SectionCard,
   Toggle,
   cx,
@@ -441,7 +438,6 @@ export function ReportEditor({ id }: { id: string }) {
 
   /* derived */
   const metrics = useMemo(() => (data ? computeMetrics(data) : null), [data]);
-  const health = useMemo(() => (data ? computeHealth(data) : null), [data]);
   const completion = useMemo(
     () => (data ? computeCompletion(data) : null),
     [data],
@@ -511,7 +507,7 @@ export function ReportEditor({ id }: { id: string }) {
   }
   /* A failed connection is not a missing report — saying so would send people
      looking for a report that is sitting there intact. */
-  if (!doc || !data || !metrics || !health || !completion) {
+  if (!doc || !data || !metrics || !completion) {
     return (
       <div className="app-bg grid min-h-screen place-items-center px-6 text-center">
         <div>
@@ -1153,41 +1149,6 @@ export function ReportEditor({ id }: { id: string }) {
                         </span>
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                {/* Health score */}
-                <div className="overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm">
-                  <div className="flex items-center gap-2 bg-gradient-to-br from-brand-500 to-brand-700 px-5 py-4 text-[13px] font-semibold text-white">
-                    <Gauge size={16} /> Store Health Score
-                  </div>
-                  <div className="flex flex-col items-center gap-3 p-4">
-                    <ScoreRing score={health.score} color={health.color} grade={health.grade} />
-                    <span
-                      className="rounded-full px-3 py-1 text-[12px] font-bold"
-                      style={{ color: health.color, backgroundColor: `${health.color}18` }}
-                    >
-                      {health.label}
-                    </span>
-                    <div className="grid w-full grid-cols-2 gap-2 text-center">
-                      <div className="rounded-xl bg-leaf-50 py-2">
-                        <div className="text-[16px] font-bold text-leaf-700">
-                          {health.strengths}
-                        </div>
-                        <div className="text-[11px] text-ink-soft">Strengths</div>
-                      </div>
-                      <div className="rounded-xl bg-red-50 py-2">
-                        <div className="text-[16px] font-bold text-danger">
-                          {health.issues}
-                        </div>
-                        <div className="text-[11px] text-ink-soft">Issues</div>
-                      </div>
-                    </div>
-                    {health.score == null && (
-                      <p className="text-center text-[11px] text-ink-soft">
-                        Add star ratings to your blocks to generate a score.
-                      </p>
-                    )}
                   </div>
                 </div>
 

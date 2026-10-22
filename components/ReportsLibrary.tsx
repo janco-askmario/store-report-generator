@@ -38,7 +38,6 @@ import {
   isDevSeed,
   seedDevReports,
 } from "@/lib/dev-seed";
-import { computeHealth } from "@/lib/scoring";
 import { storeHref } from "@/lib/url";
 import { type PresentUser, usePresence } from "@/lib/presence";
 import { PresenceAvatars } from "@/components/PresenceAvatars";
@@ -61,17 +60,13 @@ type SortKey =
   | "updated"
   | "created"
   | "name-asc"
-  | "name-desc"
-  | "health-desc"
-  | "health-asc";
+  | "name-desc";
 
 const SORT_LABELS: Record<SortKey, string> = {
   updated: "Recently updated",
   created: "Recently created",
   "name-asc": "Name (A–Z)",
   "name-desc": "Name (Z–A)",
-  "health-desc": "Health (high–low)",
-  "health-asc": "Health (low–high)",
 };
 
 export function ReportsLibrary() {
@@ -120,23 +115,6 @@ export function ReportsLibrary() {
       case "name-desc":
         rows.sort((a, b) => byName(b, a));
         break;
-      case "health-desc":
-      case "health-asc": {
-        const dir = sort === "health-desc" ? -1 : 1;
-        const scores = new Map(
-          rows.map((r) => [r.id, computeHealth(r.data).score]),
-        );
-        rows.sort((a, b) => {
-          const sa = scores.get(a.id) ?? null;
-          const sb = scores.get(b.id) ?? null;
-          // Unrated reports have no score — always sink them to the bottom.
-          if (sa == null && sb == null) return 0;
-          if (sa == null) return 1;
-          if (sb == null) return -1;
-          return dir * (sa - sb);
-        });
-        break;
-      }
     }
     return rows;
   }, [reports, q, sort]);
@@ -608,7 +586,6 @@ function ReportCard({
   onDelete: () => void;
 }) {
   const { data } = report;
-  const health = computeHealth(data);
   const href = storeHref(data.storeUrl);
   const name = data.storeName || "Untitled report";
   /*
@@ -657,18 +634,6 @@ function ReportCard({
             <div className="mt-1 text-[11px] text-ink-soft">
               Updated {fmtDate(report.updatedAt)}
             </div>
-          </div>
-          {/* score chip — pointer events back on so its tooltip still appears */}
-          <div
-            className="pointer-events-auto grid h-11 w-11 shrink-0 place-items-center rounded-full text-[13px] font-bold"
-            style={{
-              color: health.color,
-              backgroundColor: `${health.color}18`,
-              border: `2px solid ${health.color}55`,
-            }}
-            title={`Health score — ${health.label}`}
-          >
-            {health.score ?? "—"}
           </div>
         </div>
 

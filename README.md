@@ -156,9 +156,8 @@ across browsers and devices instead of living in one browser's `localStorage`.
 - **Dev test data** (`lib/dev-seed.ts`) — click the AskMario logo in the library
   header **10 times** (without pausing — a ~1s gap resets the streak) and the
   library fills with 200 throwaway reports, named `[DEV TEST] …` and spread
-  across every health band and a few months of dates. Ten more clicks delete
-  every one of them. For eyeballing pagination, sorting, search and the score
-  chips at volume. It writes to whatever Supabase project the app is pointed at,
+  across a few months of dates. Ten more clicks delete every one of them. For
+  eyeballing pagination, sorting and search at volume. It writes to whatever Supabase project the app is pointed at,
   production included — the prefix is what makes the cleanup exact.
 
 ## PDF structure

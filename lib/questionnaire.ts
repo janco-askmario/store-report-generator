@@ -194,6 +194,33 @@ export const QUESTIONNAIRE: QuestionnaireStep[] = [
         "policyPages",
         "Are Privacy Policy, Terms and Refund policy pages present?",
       ),
+      bool(
+        "deliveryDates",
+        "Are estimated delivery dates switched on?",
+        { hint: "Settings → Shipping and delivery. No adds an action plan line, not a block." },
+      ),
+      bool(
+        "returnRules",
+        "Are return and cancellation rules set?",
+        { hint: "Settings → Policies. \"No rules set\" means No. Adds an action plan line." },
+      ),
+    ],
+  },
+  {
+    id: "settings",
+    title: "Email & Orders",
+    description: "Settings → Notifications and Settings → General.",
+    questions: [
+      bool(
+        "emailAuthenticated",
+        "Is the sender email domain authenticated?",
+        { hint: "\"Needs setup\" next to Email domain authentication means No. Adds an action plan line." },
+      ),
+      bool(
+        "orderPrefix",
+        "Has the order ID prefix been changed from the default #?",
+        { hint: "Adds an action plan line when it's still the default." },
+      ),
     ],
   },
   {

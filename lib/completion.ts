@@ -24,8 +24,6 @@ function blockHasContent(b: { title: string; paragraph: string }): boolean {
 export function computeCompletion(data: ReportData): Completion {
   const good = data.goodBlocks.filter(blockHasContent);
   const bad = data.badBlocks.filter(blockHasContent);
-  const rated = [...good, ...bad];
-  const allRated = rated.length > 0 && rated.every((b) => b.rating > 0);
 
   const a = data.analytics;
   const items: CompletionItem[] = [
@@ -45,7 +43,6 @@ export function computeCompletion(data: ReportData): Completion {
     { label: "Best selling product", done: hasValue(a.bestSellingProduct) },
     { label: "At least 3 strengths", done: good.length >= 3 },
     { label: "At least 3 issues", done: bad.length >= 3 },
-    { label: "All blocks star-rated", done: allRated },
     { label: "“Success is multi-faceted” note", done: hasValue(data.goodCustom) },
     { label: "Action plan written", done: hasValue(data.actionPlan) },
   ];

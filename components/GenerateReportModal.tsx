@@ -429,6 +429,7 @@ function YesNoButton({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cx(
         "flex-1 rounded-xl border-2 px-4 py-2.5 text-[13.5px] font-semibold transition",
         active && tone === "yes" && "border-leaf-400 bg-leaf-50 text-leaf-700",

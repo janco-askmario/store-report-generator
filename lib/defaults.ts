@@ -79,7 +79,6 @@ export function createInitialData(): ReportData {
         title: "Positive reviews visible on home page",
         paragraph:
           "It is clear that this store sells high-quality bicycles and related equipment, fortified by high-quality product images. Customers feel like they can buy quality products here!",
-        rating: 5,
         highlighted: true,
       }),
     ],
@@ -89,7 +88,6 @@ export function createInitialData(): ReportData {
         title: "Slow loading speed (LCP)",
         paragraph:
           "Bloated app code is dragging your Largest Contentful Paint down. Visitors bounce before the page is usable — a direct hit to conversion.",
-        rating: 4,
         highlighted: false,
       }),
     ],

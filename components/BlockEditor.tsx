@@ -4,10 +4,8 @@ import type { HTMLAttributes } from "react";
 import { BookmarkPlus, Check, GripVertical, Trash2 } from "lucide-react";
 import type * as Y from "yjs";
 import type { Block } from "@/lib/types";
-import { shapeForKind } from "@/lib/rating-glyphs";
 import { CollabInput, RichTextArea } from "./CollabField";
 import { IconPicker } from "./IconPicker";
-import { StarRating } from "./StarRating";
 import { cx } from "./ui";
 
 type Kind = "good" | "bad";
@@ -18,8 +16,6 @@ const TONE = {
     baseSoft: "rgba(148,193,71,0.45)",
     highlight: "#7948bf",
     highlightSoft: "rgba(121,72,191,0.45)",
-    star: "#f5a524",
-    ratingLabel: "Rating",
     checkLabel: "Standout — highlight in purple",
     checkHint: "A genuinely excellent thing about the store.",
   },
@@ -28,8 +24,6 @@ const TONE = {
     baseSoft: "rgba(229,72,77,0.45)",
     highlight: "#f5a524",
     highlightSoft: "rgba(245,165,36,0.5)",
-    star: "#e5484d",
-    ratingLabel: "Severity",
     checkLabel: "Not critical — mark as improvable (orange)",
     checkHint: "Worth doing, but not an urgent problem.",
   },
@@ -51,7 +45,7 @@ export function BlockEditor({
   kind: Kind;
   index: number;
   /* Text binds to the shared document directly so two people can type in the
-     same block; the rest of the block (icon, rating, highlight) is last-write-
+     same block; the rest of the block (icon, highlight) is last-write-
      wins through `onChange`, which is the right resolution for a single choice. */
   titleText: Y.Text;
   paragraphText: Y.Text;
@@ -105,13 +99,6 @@ export function BlockEditor({
             rows={3}
             placeholder="Short paragraph explaining it to the client…"
             className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
-          />
-          <StarRating
-            value={block.rating}
-            onChange={(rating) => onChange({ rating })}
-            color={tone.star}
-            label={tone.ratingLabel}
-            shape={shapeForKind(kind)}
           />
         </div>
 

@@ -58,7 +58,7 @@ interface BlockList {
 /**
  * How much a finding moves the store's revenue or the client's trust, 1–5.
  * Only used to decide which blocks survive the `MAX_*_BLOCKS` cap — it is not
- * stored on the block and does not touch the star `rating` or the health score.
+ * stored on the block.
  *
  * 5: speed, checkout, fulfillment, basket size — direct revenue levers.
  * 4: acquisition, shipping/payment friction, navigation, policies.
@@ -137,6 +137,85 @@ const IMPACT: Record<string, number> = {
 };
 const DEFAULT_IMPACT = 3;
 
+/**
+ * The action plan line for each Bad block that makes it into the report: what
+ * to do about it, in one line. The block says what is wrong; this says what to
+ * change, so the plan never repeats the block. Like the blocks, a fix only
+ * claims what the answers support: no blaming apps or channels it can't name.
+ */
+const FIX: Record<string, string> = {
+  "Slow Loading Speed (LCP)":
+    "Compress, resize or replace the largest element on the homepage so the page looks ready in under 2.5 seconds.",
+  "Low Fulfillment Rate":
+    "Find out why paid orders aren't being fulfilled (stock, courier or process) and fix that before spending more on traffic.",
+  "Below-Benchmark Average Order Value":
+    "Add bundles, cross-sells in the cart and a free shipping threshold just above the current AOV to lift basket size.",
+  "Drop-Off From Cart to Checkout":
+    "Walk through the cart as a customer and remove anything between Add to cart and Checkout: surprise costs, forced sign-ups, slow or cluttered cart pages.",
+  "Checkout Drop-Off":
+    "Go through checkout as a customer and cut what slows the decision: extra shipping choices, surprise fees and fields that aren't needed.",
+  "Traffic Outside Target Market":
+    "Tighten ad and audience targeting to the markets the store ships to, and exclude the rest.",
+  "Social Traffic Pitfall":
+    "Move part of the social budget into search, where shoppers already know what they want.",
+  "Scattered Sales Channels":
+    "Pick the channel that sells best, give it the attention first, and only add others once it is performing.",
+  "Low Returning Customer Rate":
+    "Set up post-purchase, win-back and abandoned-cart emails so first-time buyers come back.",
+  "Returning Customer Rate Too High":
+    "Put more effort into reaching new customers: search, prospecting ads and a first-order offer.",
+  "Google Ads Room to Improve":
+    "Review keywords, search terms and landing pages, and move spend from campaigns that don't convert to those that do.",
+  "No Google Ads Investment":
+    "Start a small Google Search or Shopping campaign on the best sellers and measure it against current ad spend.",
+  "Paid Social Ads Underperforming":
+    "Compare each social campaign's spend with the sales it brings, and pause or rework the ones that don't pay back.",
+  "No Free Shipping Offered":
+    "Offer free shipping above a threshold close to the AOV, priced into the products.",
+  "Too Many Shipping Options at Checkout":
+    "Cut checkout to 2 shipping rates: the cheapest and the fastest.",
+  "Free Shipping Threshold Too High":
+    "Bring the free shipping threshold down to around the AOV, with a small price adjustment to cover it.",
+  "Inconsistent Shipping Fees by Location":
+    "Consider a flat shipping rate so customers know the cost before checkout.",
+  "Missing Policy Pages":
+    "Publish the Privacy Policy, Terms and Refund policy in Settings → Policies and link them in the footer.",
+  "No Buy-Now-Pay-Later Option":
+    "Add a Buy-Now-Pay-Later option such as PayJustNow, Happy Pay or Mobicred at checkout and on product pages.",
+  "Vague Menu & Button Labels":
+    "Rename menu items and buttons after where they lead (\"Shop Dresses\", \"Our Story\") instead of \"Shop\" or \"Learn More\".",
+  "About Us Hidden":
+    "Write or update the About Us page and add it to the header menu.",
+  "No Contact Page":
+    "Add a Contact page with email, phone and a form, and link it in the header or footer.",
+  "Redundant 'Home' Link in Navigation":
+    "Remove the Home link from the menu and use the space for a key collection.",
+  "No FAQ Page":
+    "Add an FAQ page covering shipping, returns, sizing and payment, and link it in the footer.",
+  "Footer Needs Work":
+    "Fill the footer with contact details, policy links, quick links and a newsletter sign-up.",
+  "Image Content Needs Work":
+    "Check every banner on a phone and add mobile-specific images where they crop or become hard to read.",
+  "Reinforce the Purchase Decision":
+    "Alternate homepage sections: product, then content about it, then more product.",
+  "Missing Fav-Icon":
+    "Upload a favicon in the theme settings.",
+  "Default, Un-Customised Checkout":
+    "Brand the checkout with the logo, colours and fonts so it feels like the rest of the store.",
+  "Underused Social Presence":
+    "Set a regular posting schedule and link the store from every profile.",
+  "No Social Media Presence":
+    "Set up Instagram and Facebook profiles, link them to the store, and post regularly.",
+  "Page Builder App Slowing You Down":
+    "Rebuild the page-builder pages with the theme's own sections, then remove the app.",
+  "Apps Slowing the Store":
+    "Remove or defer the apps measured as slowing the store, and recheck the load time afterwards.",
+  "Paying for Email Marketing You Don't Need":
+    "Compare what the email app does with Shopify Email, and switch if Shopify Email covers what's used.",
+  "No Shopify POS":
+    "Set up Shopify POS in the physical store so stock, sales and customers stay in one place.",
+};
+
 function candidate(title: string, paragraph: string, icon: string): Candidate {
   return {
     block: createBlock({ title, paragraph, icon }),
@@ -159,16 +238,30 @@ function badBlock(list: BlockList, title: string, paragraph: string, icon: strin
 
 /**
  * Keeps the `max` highest-impact candidates. Ties go to whichever came first in
- * the questionnaire, and the survivors keep that original order — the report
+ * the questionnaire, and both halves keep that original order — the report
  * should still read in the order the audit was walked, not shuffled by score.
+ *
+ * The cut-off half is returned rather than thrown away: a finding that didn't
+ * get a block is still a finding, and the caller gives it a place to live.
  */
-function topByImpact(candidates: Candidate[], max: number): Block[] {
-  return candidates
+function splitByImpact(
+  candidates: Candidate[],
+  max: number,
+): { kept: Block[]; dropped: Block[] } {
+  const ranked = candidates
     .map((c, order) => ({ ...c, order }))
-    .sort((a, b) => b.impact - a.impact || a.order - b.order)
-    .slice(0, max)
-    .sort((a, b) => a.order - b.order)
-    .map((c) => c.block);
+    .sort((a, b) => b.impact - a.impact || a.order - b.order);
+  const inOrder = (cs: typeof ranked) =>
+    [...cs].sort((a, b) => a.order - b.order).map((c) => c.block);
+  return {
+    kept: inOrder(ranked.slice(0, max)),
+    dropped: inOrder(ranked.slice(max)),
+  };
+}
+
+/** The observation half of a `body()` paragraph, without the tagline. */
+function observation(paragraph: string): string {
+  return paragraph.split("\n\n")[0].trim();
 }
 
 function reuseGood(list: BlockList, templateId: string) {
@@ -195,6 +288,10 @@ const SOCIAL_FOLLOWERS_GOOD = 1000;
 export function buildReportFromAnswers(answers: Answers): ReportData {
   const data = createInitialData();
   const list: BlockList = { good: [], bad: [] };
+  /* Settings fixes that are worth doing but too small to earn a block. They go
+     straight to the action plan, written as "Title: what and why" lines, the
+     same shape the PDF parses into bold-led items. */
+  const actions: string[] = [];
 
   /* ------------------------------------------------------------- Overview */
   // Both are optional — an empty answer keeps createInitialData()'s defaults
@@ -643,6 +740,30 @@ export function buildReportFromAnswers(answers: Answers): ReportData {
     );
   }
 
+  if (no(answers, "deliveryDates")) {
+    actions.push(
+      "Delivery dates: Estimated delivery dates are switched off in Shipping settings. Turn them on so shoppers see an arrival date, not just a range of business days.",
+    );
+  }
+
+  if (no(answers, "returnRules")) {
+    actions.push(
+      "Returns: No return or cancellation rules are set in Shopify, so customers can't request a return themselves. Add rules that match the published Return policy.",
+    );
+  }
+
+  if (no(answers, "emailAuthenticated")) {
+    actions.push(
+      "Email: The sender email domain isn't authenticated (SPF, DKIM, DMARC). Until it is, Shopify sends from a Shopify address instead, which looks less trustworthy and is likelier to land in spam.",
+    );
+  }
+
+  if (no(answers, "orderPrefix")) {
+    actions.push(
+      "Order numbers: Still Shopify's default #1001 format. Add a short brand prefix so orders are easy to recognise in emails and support.",
+    );
+  }
+
   /* ------------------------------------------------------------ Payments */
   if (yes(answers, "paystack")) {
     good(
@@ -998,11 +1119,33 @@ export function buildReportFromAnswers(answers: Answers): ReportData {
     );
   }
 
-  // Anything past the cap is dropped here rather than left for the editor to
+  // Anything past the cap is cut here rather than left for the editor to
   // trim: the PDF lays out exactly MAX_GOOD_BLOCKS / MAX_BAD_BLOCKS slots, and a
   // report that opens already over the limit can't be edited back under it
   // without deleting blocks the user never chose to add.
-  data.goodBlocks = topByImpact(list.good, MAX_GOOD_BLOCKS);
-  data.badBlocks = topByImpact(list.bad, MAX_BAD_BLOCKS);
+  const strengths = splitByImpact(list.good, MAX_GOOD_BLOCKS);
+  const weaknesses = splitByImpact(list.bad, MAX_BAD_BLOCKS);
+  data.goodBlocks = strengths.kept;
+  data.badBlocks = weaknesses.kept;
+
+  // The action plan follows the shape of a hand-written one: a fix for each
+  // weakness raised, then the findings that didn't get a block, then the small
+  // settings fixes. A cut weakness gets its fix line too (the plan is a list of
+  // things to do, so it doesn't need the observation), and only falls back to
+  // the observation for a title with no fix written. A cut strength still
+  // deserves its mention in the closing note.
+  const fixLine = (b: Block) =>
+    `${b.title}: ${FIX[b.title] ?? observation(b.paragraph)}`;
+  const plan = [
+    ...weaknesses.kept.filter((b) => FIX[b.title]).map(fixLine),
+    ...weaknesses.dropped.map(fixLine),
+    ...actions,
+  ];
+  data.actionPlan = plan.join("\n\n");
+  if (strengths.dropped.length) {
+    // Semicolons, not commas: several titles contain commas ("Buy Now, Pay
+    // Later Active"), and this box renders plain text, so bold can't mark them.
+    data.goodCustom = `Also working well: ${strengths.dropped.map((b) => b.title).join("; ")}.`;
+  }
   return data;
 }

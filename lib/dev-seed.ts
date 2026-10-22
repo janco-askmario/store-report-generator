@@ -9,7 +9,7 @@ import { createClient } from "./supabase/client";
  * Ten clicks on the header logo fill the library with `DEV_SEED_COUNT`
  * throwaway reports; ten more delete them again. It exists to exercise the
  * parts of the dashboard that only misbehave at volume — pagination, the sort
- * orders, search, the health-score bands — without hand-building rows.
+ * orders, search — without hand-building rows.
  *
  * The rows are ordinary reports: same `reports` table, same `data` jsonb shape
  * the editor writes. Nothing here is privileged, so it works against whatever
@@ -115,31 +115,16 @@ function isoDate(ms: number): string {
  * One throwaway report.
  *
  * `index` is only used to keep the names unique and stably ordered — the rest
- * is drawn from `rnd`, so scores spread across every health band and the sort
- * orders have something to actually sort. Every 13th report is left unrated so
- * the "—" score chip and the unrated-sinks-to-the-bottom sort both get covered.
+ * is drawn from `rnd`, so the sort orders have something to actually sort.
  */
 function buildDevReport(rnd: () => number, index: number, reportAt: number): ReportData {
   const base = createInitialData();
   const label = `${pick(rnd, PREFIXES)} ${pick(rnd, SUFFIXES)}`;
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const unrated = index % 13 === 0;
 
   const ordersMade = int(rnd, 12, 900);
   const addedToCart = ordersMade * int(rnd, 3, 12);
   const mobileSessions = int(rnd, 400, 40_000);
-
-  /*
-   * Star draws are pulled toward the store's `quality`, not uniform: good
-   * ratings rise with it and bad severities fall with it. Uniform draws average
-   * out to ~50 on every report and the library ends up entirely C/D — this way
-   * a seed spans the whole A–F range of the health bands.
-   */
-  const quality = rnd();
-  const rate = (skew: number) =>
-    unrated
-      ? 0
-      : Math.max(1, Math.min(5, Math.round(1 + skew * 4 + (rnd() * 1.4 - 0.7))));
 
   return {
     ...base,
@@ -166,7 +151,6 @@ function buildDevReport(rnd: () => number, index: number, reportAt: number): Rep
         icon: t.icon,
         title: t.title,
         paragraph: t.paragraph,
-        rating: rate(quality),
         highlighted: rnd() < 0.25,
       }),
     ),
@@ -175,7 +159,6 @@ function buildDevReport(rnd: () => number, index: number, reportAt: number): Rep
         icon: t.icon,
         title: t.title,
         paragraph: t.paragraph,
-        rating: rate(1 - quality),
         highlighted: rnd() < 0.3,
       }),
     ),

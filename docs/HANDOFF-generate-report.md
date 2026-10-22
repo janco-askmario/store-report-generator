@@ -20,7 +20,7 @@ through the live "Generate report" flow and reading every block line by line.
   every matching block was pushed and reports opened at e.g. 14/6.
 - Which blocks survive the cap is decided by the `IMPACT` table (1 to 5, keyed by block
   title, default 3). Ties go to the earlier question; survivors keep questionnaire order.
-  It is not stored on the block and does not touch `rating` or the health score.
+  It is not stored on the block.
 - An unanswered "posting regularly?" is no longer read as No ("Underused Social Presence").
 - Store name and URL are now asked in step 1 (reports were "Untitled report").
 - CLAUDE.md / README said "max 6 per section"; it is 6 Good, 9 Bad.
@@ -70,23 +70,28 @@ These reports are the product, so every block has to be true and specific:
 ## Known issues, not fixed (rough priority)
 
 1. Cart-to-checkout and checkout-completion drop-off are an if/else, so only one block can
-   appear even when both leaks exist. Needs a threshold for checkout completion (not
-   invented here; the house number should come from you).
+   appear even when both leaks exist. Decided 22 Oct: there is no house threshold for
+   checkout completion. Higher is better, but it's relative to the store, so the reviewer
+   judges it and no fixed cut-off is coded.
 2. "Paid Social Ads Underperforming" fires for any store running social ads, with no
    performance check.
 3. "Inconsistent Shipping Fees by Location" penalises calculated carrier rates (normal);
    "No Shopify POS" penalises stores that don't need POS; "Paying for Email Marketing You
    Don't Need" asserts Shopify Email is an equivalent.
-4. Star ratings are never set by generation, so generated reports show "Unrated" health.
-5. Blocks dropped by the cap are dropped silently; the modal doesn't say how many.
-6. The action plan field is left blank by generation. In practice it is a short list of
-   findings that did not get a block, plus a one-line fix for each block raised.
+4. ~~Star ratings are never set by generation.~~ Retired (22 Oct): star ratings and the
+   Health Score were removed from the app. The `rating` field stays so saved reports load.
+5. ~~Blocks dropped by the cap are dropped silently.~~ Fixed (22 Oct): cut Bad findings
+   become action plan lines, cut Good findings are listed in the "Success is
+   Multi-Faceted" note.
+6. ~~The action plan is left blank by generation.~~ Fixed (22 Oct): it gets a one-line fix
+   for each Bad block raised (the `FIX` table in `lib/questionnaire-rules.ts`, drafted for
+   review), then cut findings, then settings fixes.
 7. Social sessions and referrer sales are collected, but the PDF has no socials/referrers
    section (the README still describes one).
-8. Yes/No buttons have no `aria-pressed`.
-9. Questions that would have caught real findings and don't exist yet: order ID format,
-   email domain authentication (SPF/DKIM/DMARC), estimated delivery dates, return rules,
-   delivery promises on the Help Center vs checkout, collection links in the menu that
+8. ~~Yes/No buttons have no `aria-pressed`.~~ Fixed (22 Oct).
+9. Questions that would have caught real findings and don't exist yet (order ID format,
+   email domain authentication, estimated delivery dates and return rules were added
+   22 Oct as action-plan questions): delivery promises on the Help Center vs checkout, collection links in the menu that
    point somewhere unexpected, products with no reviews, restock forms on in-stock products.
 
 ## Verifying

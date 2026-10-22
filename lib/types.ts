@@ -4,9 +4,10 @@ export interface Block {
   title: string;
   paragraph: string;
   /**
-   * Star rating 0–5 (0 = unrated). For Good blocks this is how strong the
-   * positive is; for Bad blocks it is severity (5 = most critical). Feeds the
-   * overall store Health Score.
+   * Retired star rating 0–5. Nothing shows or edits it any more (the stars and
+   * the Health Score they fed were removed), but it stays in the shape so
+   * reports saved with ratings, and the shared Yjs documents carrying them,
+   * still load without a migration.
    */
   rating: number;
   highlighted: boolean; // good -> purple, bad -> orange

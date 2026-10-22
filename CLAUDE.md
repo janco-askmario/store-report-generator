@@ -29,7 +29,7 @@ Supabase migrations live in `supabase/migrations/` and must be applied **in file
 Runs on every non-static route. Three states: no user → redirect to `/login`; user but `is_approved` RPC false → redirect to `/pending` (holding page; RLS is the real gate, this is only UX); approved → normal access, kept out of `/login`/`/pending`. `/reset-password` and `/api/password-reset` are public because Supabase's recovery flow needs to work while signed out.
 
 ### Data model (`lib/types.ts`, `lib/store.ts`)
-`ReportData` is the canonical report shape — store basics, analytics inputs, Good/Bad `Block[]` (max 6 Good, 9 Bad), page-3 notes, action plan. `lib/calc.ts` derives conversion rate, AOV, add-to-cart %, fulfillment rate, and device split from the raw analytics fields — manual entries always override the computed value. `lib/scoring.ts` / `lib/benchmarks.ts` turn those numbers into the health-band scoring shown in the library.
+`ReportData` is the canonical report shape — store basics, analytics inputs, Good/Bad `Block[]` (max 6 Good, 9 Bad), page-3 notes, action plan. `lib/calc.ts` derives conversion rate, AOV, add-to-cart %, fulfillment rate, and device split from the raw analytics fields — manual entries always override the computed value. `lib/benchmarks.ts` grades those numbers against the house benchmarks. Blocks still carry a `rating` field, but star ratings and the Health Score were retired; it is kept only so saved reports load unchanged.
 
 ### Realtime collaboration (`lib/collab/`)
 This is the architectural core of the editor — read `lib/collab/doc.ts`'s module comment before touching it.
