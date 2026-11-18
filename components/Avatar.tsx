@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { avatarFor, colorFor, initials } from "@/lib/avatars";
-import { cx } from "@/components/ui";
+import { avatarFor, colorFor, initials } from '@/lib/avatars';
+import { cx } from '@/components/ui';
 
 /**
  * One person, one circle — their pixel portrait if they have one, their coloured
@@ -13,42 +13,42 @@ import { cx } from "@/components/ui";
  * portrait legible against the white panel.
  */
 export function Avatar({
-  email,
-  size = 32,
-  dimmed = false,
-  className,
+	email,
+	size = 32,
+	dimmed = false,
+	className
 }: {
-  email: string;
-  size?: number;
-  /** Offline teammates fade back without leaving the list. */
-  dimmed?: boolean;
-  className?: string;
+	email: string;
+	size?: number;
+	/** Offline teammates fade back without leaving the list. */
+	dimmed?: boolean;
+	className?: string;
 }) {
-  const src = avatarFor(email);
+	const src = avatarFor(email);
 
-  return (
-    <span
-      className={cx(
-        "grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold text-white transition",
-        dimmed && "opacity-40",
-        className,
-      )}
-      style={{
-        width: size,
-        height: size,
-        backgroundColor: colorFor(email),
-        fontSize: Math.round(size * 0.4),
-      }}
-      aria-hidden
-    >
-      {src ? (
-        // Not next/image: these are 16×16 sprites, so there is nothing to
-        // optimise and resampling is exactly what must not happen to them.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="pixel-art h-full w-full object-cover" />
-      ) : (
-        initials(email)
-      )}
-    </span>
-  );
+	return (
+		<span
+			className={cx(
+				'grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold text-white transition',
+				dimmed && 'opacity-40',
+				className
+			)}
+			style={{
+				width: size,
+				height: size,
+				backgroundColor: colorFor(email),
+				fontSize: Math.round(size * 0.4)
+			}}
+			aria-hidden
+		>
+			{src ? (
+				// Not next/image: these are 16×16 sprites, so there is nothing to
+				// optimise and resampling is exactly what must not happen to them.
+				// eslint-disable-next-line @next/next/no-img-element
+				<img src={src} alt="" className="pixel-art h-full w-full object-cover" />
+			) : (
+				initials(email)
+			)}
+		</span>
+	);
 }

@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
-import { CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { cx } from "@/components/ui";
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
+import { CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { cx } from '@/components/ui';
 
 /**
  * "reset" is the no-mailer password reset: type your address and a new password
@@ -13,397 +13,382 @@ import { cx } from "@/components/ui";
  * admin has to let you in again. app/api/password-reset/route.ts explains why
  * that lock is what makes an unauthenticated reset endpoint safe to expose.
  */
-type Mode = "signin" | "signup" | "reset";
+type Mode = 'signin' | 'signup' | 'reset';
 
 /** Supabase's raw auth errors leak implementation detail — say it plainly. */
 function friendlyError(message: string, mode: Mode): string {
-  if (/invalid login credentials/i.test(message)) {
-    return mode === "signin"
-      ? "No account matches that email and password. If you're new, create an account first."
-      : "Those details were rejected.";
-  }
-  if (/already registered|already exists/i.test(message)) {
-    return "An account with this email already exists — switch to Sign in.";
-  }
-  if (/signups? not allowed|signup is disabled/i.test(message)) {
-    return "New accounts are disabled in Supabase → Authentication → Sign In / Providers.";
-  }
-  if (/password/i.test(message) && /6|at least|short/i.test(message)) {
-    return "Password must be at least 6 characters.";
-  }
-  if (/rate limit|too many/i.test(message)) {
-    return "Too many attempts. Wait a minute and try again.";
-  }
-  return message;
+	if (/invalid login credentials/i.test(message)) {
+		return mode === 'signin'
+			? "No account matches that email and password. If you're new, create an account first."
+			: 'Those details were rejected.';
+	}
+	if (/already registered|already exists/i.test(message)) {
+		return 'An account with this email already exists — switch to Sign in.';
+	}
+	if (/signups? not allowed|signup is disabled/i.test(message)) {
+		return 'New accounts are disabled in Supabase → Authentication → Sign In / Providers.';
+	}
+	if (/password/i.test(message) && /6|at least|short/i.test(message)) {
+		return 'Password must be at least 6 characters.';
+	}
+	if (/rate limit|too many/i.test(message)) {
+		return 'Too many attempts. Wait a minute and try again.';
+	}
+	return message;
 }
 
 function LoginForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+	const router = useRouter();
+	const searchParams = useSearchParams();
+	const next = searchParams.get('next') || '/';
 
-  const [mode, setMode] = useState<Mode>("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(searchParams.get("error"));
-  const [resetDone, setResetDone] = useState(false);
+	const [mode, setMode] = useState<Mode>('signin');
+	const [email, setEmail] = useState('');
+	const [password, setPassword] = useState('');
+	const [confirm, setConfirm] = useState('');
+	const [showPassword, setShowPassword] = useState(false);
+	const [submitting, setSubmitting] = useState(false);
+	const [error, setError] = useState<string | null>(searchParams.get('error'));
+	const [resetDone, setResetDone] = useState(false);
 
-  const switchMode = (m: Mode) => {
-    setMode(m);
-    setError(null);
-    setConfirm("");
-    setResetDone(false);
-  };
+	const switchMode = (m: Mode) => {
+		setMode(m);
+		setError(null);
+		setConfirm('');
+		setResetDone(false);
+	};
 
-  const goToApp = () => {
-    // Only ever follow an in-app path, so ?next= can't bounce us off-site.
-    router.push(next.startsWith("/") && !next.startsWith("//") ? next : "/");
-    router.refresh(); // let the middleware see the new session cookie
-  };
+	const goToApp = () => {
+		// Only ever follow an in-app path, so ?next= can't bounce us off-site.
+		router.push(next.startsWith('/') && !next.startsWith('//') ? next : '/');
+		router.refresh(); // let the middleware see the new session cookie
+	};
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+	const onSubmit = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setError(null);
 
-    // Both modes that *choose* a password confirm it: a typo in either is
-    // unrecoverable without email resets.
-    if (mode !== "signin") {
-      if (password !== confirm) {
-        setError("The two passwords don't match.");
-        return;
-      }
-      if (password.length < 6) {
-        setError("Password must be at least 6 characters.");
-        return;
-      }
-    }
+		// Both modes that *choose* a password confirm it: a typo in either is
+		// unrecoverable without email resets.
+		if (mode !== 'signin') {
+			if (password !== confirm) {
+				setError("The two passwords don't match.");
+				return;
+			}
+			if (password.length < 6) {
+				setError('Password must be at least 6 characters.');
+				return;
+			}
+		}
 
-    setSubmitting(true);
+		setSubmitting(true);
 
-    if (mode === "reset") {
-      const res = await fetch("/api/password-reset", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const body = await res.json().catch(() => ({}) as { error?: string });
+		if (mode === 'reset') {
+			const res = await fetch('/api/password-reset', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ email, password })
+			});
+			const body = await res.json().catch(() => ({}) as { error?: string });
 
-      if (!res.ok) {
-        setError(body.error ?? "Could not reset the password. Try again.");
-        setSubmitting(false);
-        return;
-      }
-      // No redirect: the account is locked until an admin re-approves it, so
-      // signing in right now would only land them on /pending.
-      setResetDone(true);
-      setSubmitting(false);
-      return;
-    }
+			if (!res.ok) {
+				setError(body.error ?? 'Could not reset the password. Try again.');
+				setSubmitting(false);
+				return;
+			}
+			// No redirect: the account is locked until an admin re-approves it, so
+			// signing in right now would only land them on /pending.
+			setResetDone(true);
+			setSubmitting(false);
+			return;
+		}
 
-    const supabase = createClient();
+		const supabase = createClient();
 
-    if (mode === "signin") {
-      // Strictly a sign-in: an unknown email is an error, never a new account.
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        setError(friendlyError(error.message, "signin"));
-        setSubmitting(false);
-        return;
-      }
-    } else {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setError(friendlyError(error.message, "signup"));
-        setSubmitting(false);
-        return;
-      }
-      // No session means Supabase is still set to confirm addresses by email,
-      // which defeats the point — the account exists but cannot be used yet.
-      if (!data.session) {
-        setError(
-          "Account created, but email confirmation is switched on. Turn off " +
-            "“Confirm email” in Supabase → Authentication → Sign In / Providers.",
-        );
-        setSubmitting(false);
-        return;
-      }
-      // New accounts start unapproved — send them to the holding page rather
-      // than the app, which the middleware would bounce them out of anyway.
-      router.push("/pending");
-      router.refresh();
-      return;
-    }
+		if (mode === 'signin') {
+			// Strictly a sign-in: an unknown email is an error, never a new account.
+			const { error } = await supabase.auth.signInWithPassword({
+				email,
+				password
+			});
+			if (error) {
+				setError(friendlyError(error.message, 'signin'));
+				setSubmitting(false);
+				return;
+			}
+		} else {
+			const { data, error } = await supabase.auth.signUp({ email, password });
+			if (error) {
+				setError(friendlyError(error.message, 'signup'));
+				setSubmitting(false);
+				return;
+			}
+			// No session means Supabase is still set to confirm addresses by email,
+			// which defeats the point — the account exists but cannot be used yet.
+			if (!data.session) {
+				setError(
+					'Account created, but email confirmation is switched on. Turn off ' +
+						'“Confirm email” in Supabase → Authentication → Sign In / Providers.'
+				);
+				setSubmitting(false);
+				return;
+			}
+			// New accounts start unapproved — send them to the holding page rather
+			// than the app, which the middleware would bounce them out of anyway.
+			router.push('/pending');
+			router.refresh();
+			return;
+		}
 
-    goToApp();
-  };
+		goToApp();
+	};
 
-  const isSignup = mode === "signup";
-  const isReset = mode === "reset";
-  /** Signup and reset both pick a new password; sign-in supplies an existing one. */
-  const choosesPassword = isSignup || isReset;
+	const isSignup = mode === 'signup';
+	const isReset = mode === 'reset';
+	/** Signup and reset both pick a new password; sign-in supplies an existing one. */
+	const choosesPassword = isSignup || isReset;
 
-  if (resetDone) {
-    return (
-      <div className="text-center">
-        <CheckCircle2 className="mx-auto mb-3 text-emerald-600" size={26} />
-        <h1 className="text-[18px] font-semibold tracking-tight text-ink">
-          Password updated
-        </h1>
-        <p className="mt-2 text-[13px] text-ink-soft">
-          If <span className="font-semibold text-ink">{email}</span> has an
-          account, its password is now the one you just chose — and the account
-          is locked until an admin approves it again.
-        </p>
-        <p className="mt-3 text-[13px] text-ink-soft">
-          Message whoever runs the reports dashboard and ask them to re-approve
-          you. It takes them a few seconds.
-        </p>
-        <button
-          type="button"
-          onClick={() => switchMode("signin")}
-          className="mt-5 w-full rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2.5 text-[14px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110"
-        >
-          Back to sign in
-        </button>
-      </div>
-    );
-  }
+	if (resetDone) {
+		return (
+			<div className="text-center">
+				<CheckCircle2 className="mx-auto mb-3 text-emerald-600" size={26} />
+				<h1 className="text-ink text-[18px] font-semibold tracking-tight">Password updated</h1>
+				<p className="text-ink-soft mt-2 text-[13px]">
+					If <span className="text-ink font-semibold">{email}</span> has an account, its password is
+					now the one you just chose — and the account is locked until an admin approves it again.
+				</p>
+				<p className="text-ink-soft mt-3 text-[13px]">
+					Message whoever runs the reports dashboard and ask them to re-approve you. It takes them a
+					few seconds.
+				</p>
+				<button
+					type="button"
+					onClick={() => switchMode('signin')}
+					className="from-brand-500 to-brand-700 shadow-brand-500/30 mt-5 w-full rounded-xl bg-gradient-to-br px-4 py-2.5 text-[14px] font-semibold text-white shadow-md transition hover:brightness-110"
+				>
+					Back to sign in
+				</button>
+			</div>
+		);
+	}
 
-  return (
-    <>
-      <div className="mb-6 text-center">
-        {/* Sized by height, width auto — the logo is a 2.8:1 wordmark, so a
+	return (
+		<>
+			<div className="mb-6 text-center">
+				{/* Sized by height, width auto — the logo is a 2.8:1 wordmark, so a
             fixed square would squash it. No gradient tile behind it either: it
             carries its own purple and green. */}
-        <Image
-          src="/AskMario-logo.png"
-          alt="AskMario"
-          width={1400}
-          height={500}
-          priority
-          className="mx-auto mb-4 h-11 w-auto"
-        />
-        <h1 className="text-[18px] font-semibold tracking-tight text-ink">
-          {isReset ? "Reset your password" : "Store Reports"}
-        </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">
-          {isReset
-            ? "Choose a new password for your account. An admin re-approves you before you can sign in — this locks the account until they do."
-            : isSignup
-              ? "Create an account with your AskMario email — an admin approves it before you can sign in."
-              : "Sign in to open the AskMario report library."}
-        </p>
-      </div>
+				<Image
+					src="/AskMario-logo.png"
+					alt="AskMario"
+					width={1400}
+					height={500}
+					priority
+					className="mx-auto mb-4 h-11 w-auto"
+				/>
+				<h1 className="text-ink text-[18px] font-semibold tracking-tight">
+					{isReset ? 'Reset your password' : 'Store Reports'}
+				</h1>
+				<p className="text-ink-soft mt-1 text-[13px]">
+					{isReset
+						? 'Choose a new password for your account. An admin re-approves you before you can sign in — this locks the account until they do.'
+						: isSignup
+							? 'Create an account with your AskMario email — an admin approves it before you can sign in.'
+							: 'Sign in to open the AskMario report library.'}
+				</p>
+			</div>
 
-      {/* Mode switch. Hidden during a reset, which is neither tab. */}
-      <div
-        role="tablist"
-        aria-label="Sign in or create account"
-        className={cx(
-          "mb-5 grid grid-cols-2 gap-1 rounded-xl bg-black/[0.04] p-1",
-          isReset && "hidden",
-        )}
-      >
-        {(
-          [
-            ["signin", "Sign in"],
-            ["signup", "Create account"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            role="tab"
-            type="button"
-            aria-selected={mode === value}
-            onClick={() => switchMode(value)}
-            className={cx(
-              "rounded-lg px-3 py-2 text-[13px] font-semibold transition",
-              mode === value
-                ? "bg-white text-brand-700 shadow-sm"
-                : "text-ink-soft hover:text-ink",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+			{/* Mode switch. Hidden during a reset, which is neither tab. */}
+			<div
+				role="tablist"
+				aria-label="Sign in or create account"
+				className={cx(
+					'mb-5 grid grid-cols-2 gap-1 rounded-xl bg-black/[0.04] p-1',
+					isReset && 'hidden'
+				)}
+			>
+				{(
+					[
+						['signin', 'Sign in'],
+						['signup', 'Create account']
+					] as const
+				).map(([value, label]) => (
+					<button
+						key={value}
+						role="tab"
+						type="button"
+						aria-selected={mode === value}
+						onClick={() => switchMode(value)}
+						className={cx(
+							'rounded-lg px-3 py-2 text-[13px] font-semibold transition',
+							mode === value ? 'text-brand-700 bg-white shadow-sm' : 'text-ink-soft hover:text-ink'
+						)}
+					>
+						{label}
+					</button>
+				))}
+			</div>
 
-      <form onSubmit={onSubmit} className="space-y-3">
-        <div>
-          <label
-            htmlFor="email"
-            className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-ink-soft"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            autoFocus
-            autoComplete="username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@askmario.com"
-            className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10"
-          />
-        </div>
+			<form onSubmit={onSubmit} className="space-y-3">
+				<div>
+					<label
+						htmlFor="email"
+						className="text-ink-soft mb-1.5 block text-[12px] font-semibold tracking-wide uppercase"
+					>
+						Email
+					</label>
+					<input
+						id="email"
+						type="email"
+						required
+						autoFocus
+						autoComplete="username"
+						value={email}
+						onChange={(e) => setEmail(e.target.value)}
+						placeholder="you@askmario.com"
+						className="text-ink placeholder:text-ink-soft/50 focus:border-brand-400 focus:ring-brand-500/10 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] transition outline-none focus:ring-4"
+					/>
+				</div>
 
-        <div>
-          <div className="mb-1.5 flex items-baseline justify-between gap-3">
-            <label
-              htmlFor="password"
-              className="block text-[12px] font-semibold uppercase tracking-wide text-ink-soft"
-            >
-              {isReset ? "New password" : "Password"}
-            </label>
-            {mode === "signin" && (
-              <button
-                type="button"
-                onClick={() => switchMode("reset")}
-                className="text-[12px] font-semibold text-brand-700 underline-offset-2 hover:underline"
-              >
-                Forgot password?
-              </button>
-            )}
-          </div>
-          <div className="relative">
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              required
-              autoComplete={isSignup ? "new-password" : "current-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 pr-11 text-[14px] text-ink outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-ink-soft transition hover:bg-black/[0.04] hover:text-ink"
-            >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          {choosesPassword && (
-            <p className="mt-1.5 text-[11px] text-ink-soft">
-              At least 6 characters.
-            </p>
-          )}
-        </div>
+				<div>
+					<div className="mb-1.5 flex items-baseline justify-between gap-3">
+						<label
+							htmlFor="password"
+							className="text-ink-soft block text-[12px] font-semibold tracking-wide uppercase"
+						>
+							{isReset ? 'New password' : 'Password'}
+						</label>
+						{mode === 'signin' && (
+							<button
+								type="button"
+								onClick={() => switchMode('reset')}
+								className="text-brand-700 text-[12px] font-semibold underline-offset-2 hover:underline"
+							>
+								Forgot password?
+							</button>
+						)}
+					</div>
+					<div className="relative">
+						<input
+							id="password"
+							type={showPassword ? 'text' : 'password'}
+							required
+							autoComplete={isSignup ? 'new-password' : 'current-password'}
+							value={password}
+							onChange={(e) => setPassword(e.target.value)}
+							className="text-ink focus:border-brand-400 focus:ring-brand-500/10 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 pr-11 text-[14px] transition outline-none focus:ring-4"
+						/>
+						<button
+							type="button"
+							onClick={() => setShowPassword((v) => !v)}
+							aria-label={showPassword ? 'Hide password' : 'Show password'}
+							className="text-ink-soft hover:text-ink absolute top-1/2 right-1.5 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg transition hover:bg-black/[0.04]"
+						>
+							{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+						</button>
+					</div>
+					{choosesPassword && (
+						<p className="text-ink-soft mt-1.5 text-[11px]">At least 6 characters.</p>
+					)}
+				</div>
 
-        {/* Typos are unrecoverable without email resets, so confirm on signup. */}
-        {choosesPassword && (
-          <div>
-            <label
-              htmlFor="confirm"
-              className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-ink-soft"
-            >
-              Confirm password
-            </label>
-            <input
-              id="confirm"
-              type={showPassword ? "text" : "password"}
-              required
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] text-ink outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10"
-            />
-          </div>
-        )}
+				{/* Typos are unrecoverable without email resets, so confirm on signup. */}
+				{choosesPassword && (
+					<div>
+						<label
+							htmlFor="confirm"
+							className="text-ink-soft mb-1.5 block text-[12px] font-semibold tracking-wide uppercase"
+						>
+							Confirm password
+						</label>
+						<input
+							id="confirm"
+							type={showPassword ? 'text' : 'password'}
+							required
+							autoComplete="new-password"
+							value={confirm}
+							onChange={(e) => setConfirm(e.target.value)}
+							className="text-ink focus:border-brand-400 focus:ring-brand-500/10 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] transition outline-none focus:ring-4"
+						/>
+					</div>
+				)}
 
-        {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-[12px] text-danger">
-            {error}
-          </p>
-        )}
+				{error && <p className="text-danger rounded-lg bg-red-50 px-3 py-2 text-[12px]">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 px-4 py-2.5 text-[14px] font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-110 disabled:opacity-60"
-        >
-          {submitting ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              {isReset
-                ? "Resetting…"
-                : isSignup
-                  ? "Creating account…"
-                  : "Signing in…"}
-            </>
-          ) : isReset ? (
-            "Reset password"
-          ) : isSignup ? (
-            "Create account"
-          ) : (
-            "Sign in"
-          )}
-        </button>
-      </form>
+				<button
+					type="submit"
+					disabled={submitting}
+					className="from-brand-500 to-brand-700 shadow-brand-500/30 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br px-4 py-2.5 text-[14px] font-semibold text-white shadow-md transition hover:brightness-110 disabled:opacity-60"
+				>
+					{submitting ? (
+						<>
+							<Loader2 size={16} className="animate-spin" />
+							{isReset ? 'Resetting…' : isSignup ? 'Creating account…' : 'Signing in…'}
+						</>
+					) : isReset ? (
+						'Reset password'
+					) : isSignup ? (
+						'Create account'
+					) : (
+						'Sign in'
+					)}
+				</button>
+			</form>
 
-      <p className="mt-5 text-center text-[12px] text-ink-soft">
-        {isReset ? (
-          <>
-            Remembered it?{" "}
-            <button
-              type="button"
-              onClick={() => switchMode("signin")}
-              className="font-semibold text-brand-700 underline-offset-2 hover:underline"
-            >
-              Back to sign in
-            </button>
-          </>
-        ) : isSignup ? (
-          <>
-            Already have an account?{" "}
-            <button
-              type="button"
-              onClick={() => switchMode("signin")}
-              className="font-semibold text-brand-700 underline-offset-2 hover:underline"
-            >
-              Sign in
-            </button>
-          </>
-        ) : (
-          <>
-            First time here?{" "}
-            <button
-              type="button"
-              onClick={() => switchMode("signup")}
-              className="font-semibold text-brand-700 underline-offset-2 hover:underline"
-            >
-              Create an account
-            </button>
-          </>
-        )}
-      </p>
-    </>
-  );
+			<p className="text-ink-soft mt-5 text-center text-[12px]">
+				{isReset ? (
+					<>
+						Remembered it?{' '}
+						<button
+							type="button"
+							onClick={() => switchMode('signin')}
+							className="text-brand-700 font-semibold underline-offset-2 hover:underline"
+						>
+							Back to sign in
+						</button>
+					</>
+				) : isSignup ? (
+					<>
+						Already have an account?{' '}
+						<button
+							type="button"
+							onClick={() => switchMode('signin')}
+							className="text-brand-700 font-semibold underline-offset-2 hover:underline"
+						>
+							Sign in
+						</button>
+					</>
+				) : (
+					<>
+						First time here?{' '}
+						<button
+							type="button"
+							onClick={() => switchMode('signup')}
+							className="text-brand-700 font-semibold underline-offset-2 hover:underline"
+						>
+							Create an account
+						</button>
+					</>
+				)}
+			</p>
+		</>
+	);
 }
 
 export default function LoginPage() {
-  return (
-    <div className="app-bg grid min-h-screen place-items-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-black/5 bg-white/90 p-7 shadow-sm shadow-brand-900/5 backdrop-blur">
-        <Suspense
-          fallback={
-            <div className="grid place-items-center py-10">
-              <Loader2 className="animate-spin text-ink-soft" size={22} />
-            </div>
-          }
-        >
-          <LoginForm />
-        </Suspense>
-      </div>
-    </div>
-  );
+	return (
+		<div className="app-bg grid min-h-screen place-items-center px-4">
+			<div className="shadow-brand-900/5 w-full max-w-sm rounded-2xl border border-black/5 bg-white/90 p-7 shadow-sm backdrop-blur">
+				<Suspense
+					fallback={
+						<div className="grid place-items-center py-10">
+							<Loader2 className="text-ink-soft animate-spin" size={22} />
+						</div>
+					}
+				>
+					<LoginForm />
+				</Suspense>
+			</div>
+		</div>
+	);
 }

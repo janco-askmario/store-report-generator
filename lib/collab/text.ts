@@ -1,10 +1,10 @@
-import type * as Y from "yjs";
+import type * as Y from 'yjs';
 
 /**
  * Marks a text edit as originating from this browser's own keystrokes, so the
  * binding knows not to fight the browser over caret position.
  */
-export const TEXT_ORIGIN = "local-text";
+export const TEXT_ORIGIN = 'local-text';
 
 type DeltaOp = { insert?: unknown; delete?: number; retain?: number };
 
@@ -18,39 +18,32 @@ type DeltaOp = { insert?: unknown; delete?: number; retain?: number };
  * their sentence would vanish. Typing one character has to be recorded as
  * inserting one character.
  */
-export function applyTextDiff(
-  text: Y.Text,
-  next: string,
-  origin: unknown = TEXT_ORIGIN,
-): void {
-  const prev = text.toString();
-  if (prev === next) return;
+export function applyTextDiff(text: Y.Text, next: string, origin: unknown = TEXT_ORIGIN): void {
+	const prev = text.toString();
+	if (prev === next) return;
 
-  const max = Math.min(prev.length, next.length);
+	const max = Math.min(prev.length, next.length);
 
-  let start = 0;
-  while (start < max && prev[start] === next[start]) start++;
+	let start = 0;
+	while (start < max && prev[start] === next[start]) start++;
 
-  let end = 0;
-  while (
-    end < max - start &&
-    prev[prev.length - 1 - end] === next[next.length - 1 - end]
-  ) {
-    end++;
-  }
+	let end = 0;
+	while (end < max - start && prev[prev.length - 1 - end] === next[next.length - 1 - end]) {
+		end++;
+	}
 
-  const removed = prev.length - start - end;
-  const inserted = next.slice(start, next.length - end);
+	const removed = prev.length - start - end;
+	const inserted = next.slice(start, next.length - end);
 
-  const run = () => {
-    if (removed > 0) text.delete(start, removed);
-    if (inserted.length > 0) text.insert(start, inserted);
-  };
+	const run = () => {
+		if (removed > 0) text.delete(start, removed);
+		if (inserted.length > 0) text.insert(start, inserted);
+	};
 
-  // Both halves must land in one transaction, or peers briefly observe the
-  // deletion without the replacement.
-  if (text.doc) text.doc.transact(run, origin);
-  else run();
+	// Both halves must land in one transaction, or peers briefly observe the
+	// deletion without the replacement.
+	if (text.doc) text.doc.transact(run, origin);
+	else run();
 }
 
 /**
@@ -65,20 +58,20 @@ export function applyTextDiff(
  * length they added or removed.
  */
 export function mapCaret(pos: number, delta: DeltaOp[]): number {
-  let index = 0;
-  let out = pos;
+	let index = 0;
+	let out = pos;
 
-  for (const op of delta) {
-    if (op.retain != null) {
-      index += op.retain;
-    } else if (op.insert != null) {
-      const len = typeof op.insert === "string" ? op.insert.length : 1;
-      if (index < out) out += len;
-      index += len;
-    } else if (op.delete != null) {
-      if (index < out) out -= Math.min(op.delete, out - index);
-    }
-  }
+	for (const op of delta) {
+		if (op.retain != null) {
+			index += op.retain;
+		} else if (op.insert != null) {
+			const len = typeof op.insert === 'string' ? op.insert.length : 1;
+			if (index < out) out += len;
+			index += len;
+		} else if (op.delete != null) {
+			if (index < out) out -= Math.min(op.delete, out - index);
+		}
+	}
 
-  return Math.max(0, out);
+	return Math.max(0, out);
 }

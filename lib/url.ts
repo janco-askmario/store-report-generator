@@ -10,13 +10,13 @@
  * the raw text instead.
  */
 export function storeHref(raw: string): string | null {
-  const url = raw.trim();
-  if (!url) return null;
-  if (/^https?:\/\//i.test(url)) return url;
-  // mailto:, javascript:, data:… — none of them are a store address.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return null;
-  // Needs a dot before the first slash to be a hostname at all; "draft notes"
-  // typed into the URL field should stay plain text rather than become a link.
-  if (!/^[^\s/]+\.[^\s/]/.test(url)) return null;
-  return `https://${url}`;
+	const url = raw.trim();
+	if (!url) return null;
+	if (/^https?:\/\//i.test(url)) return url;
+	// mailto:, javascript:, data:… — none of them are a store address.
+	if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return null;
+	// Needs a dot before the first slash to be a hostname at all; "draft notes"
+	// typed into the URL field should stay plain text rather than become a link.
+	if (!/^[^\s/]+\.[^\s/]/.test(url)) return null;
+	return `https://${url}`;
 }

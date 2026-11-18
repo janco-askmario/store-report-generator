@@ -22,7 +22,7 @@ Reports are stored in Supabase (Postgres + Auth), so the library follows you
 across browsers and devices instead of living in one browser's `localStorage`.
 
 1. **Keys** — Supabase dashboard → **Project Settings → API**. Copy the
-   *Project URL* and the *anon / publishable* key into `.env.local`:
+   _Project URL_ and the _anon / publishable_ key into `.env.local`:
 
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
@@ -60,7 +60,7 @@ across browsers and devices instead of living in one browser's `localStorage`.
    online (that comes from presence, not the table) but nobody who is offline.
 
 3. **Lock down sign-ups** — Authentication → **Sign In / Providers** → turn off
-   *Allow new users to sign up*, then invite teammates under Authentication →
+   _Allow new users to sign up_, then invite teammates under Authentication →
    Users. Any signed-in account can read and edit every report, so an open
    sign-up form would hand client data to anyone.
 
@@ -73,12 +73,12 @@ across browsers and devices instead of living in one browser's `localStorage`.
 
 ## Scripts
 
-| Script                 | What it does                                            |
-| ---------------------- | ------------------------------------------------------- |
-| `npm run dev`          | Start the dashboard in dev mode                         |
-| `npm run build`        | Production build                                        |
-| `npm run start`        | Serve the production build                              |
-| `npm run render:sample`| Render a fully-populated sample PDF to `sample-report.pdf` (handy for tweaking the PDF layout without clicking through the UI) |
+| Script                  | What it does                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev`           | Start the dashboard in dev mode                                                                                                |
+| `npm run build`         | Production build                                                                                                               |
+| `npm run start`         | Serve the production build                                                                                                     |
+| `npm run render:sample` | Render a fully-populated sample PDF to `sample-report.pdf` (handy for tweaking the PDF layout without clicking through the UI) |
 
 ## How it works
 
@@ -106,6 +106,7 @@ across browsers and devices instead of living in one browser's `localStorage`.
   desktop — and it defaults to open. The hamburger and the panel are in
   different components, so they talk over a context; `TeamSidebarToggle` is the
   button.
+
 - **Avatars** (`lib/avatars.ts`, `public/avatars/`) — 16×16 pixel portraits,
   matched to people by the local part of their email (`james@…`, `james.smith@…`
   and `jamesb@…` all get `james.png`); addresses that don't carry the person's
@@ -151,6 +152,7 @@ across browsers and devices instead of living in one browser's `localStorage`.
   the scroll position across an update and swaps all three pages in at once
   instead of flashing an empty panel. If pdf.js or its worker fails to load, the
   panel falls back to the iframe viewer — worse live behaviour, still a preview.
+
 - **Icons** (`lib/icons.ts`) — one shared definition set drives both the
   dashboard picker and the PDF, so a block's icon always matches.
 - **Dev test data** (`lib/dev-seed.ts`) — click the AskMario logo in the library
@@ -164,12 +166,12 @@ across browsers and devices instead of living in one browser's `localStorage`.
 ## PDF structure
 
 1. **Page 1** — Cover (STORE REPORT / store name / date range) + KPI strip →
-   *Things You Are Doing Well* (2×3) → *Notes / Success is Multi-Faceted* →
-   *Food for Thought*.
-2. **Page 2** — *Improve These* (2×3) → notes → *4 Golden Rules of Ecommerce*.
-3. **Page 3** — *The Numbers* (Conversion / AOV / Add-to-Cart vs Conversion) →
-   performance snapshot (+ socials & referrers if enabled) → *Action Plan
-   Summary* → closing.
+   _Things You Are Doing Well_ (2×3) → _Notes / Success is Multi-Faceted_ →
+   _Food for Thought_.
+2. **Page 2** — _Improve These_ (2×3) → notes → _4 Golden Rules of Ecommerce_.
+3. **Page 3** — _The Numbers_ (Conversion / AOV / Add-to-Cart vs Conversion) →
+   performance snapshot (+ socials & referrers if enabled) → _Action Plan
+   Summary_ → closing.
 
 ## Notes
 

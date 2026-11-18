@@ -1,4 +1,4 @@
-import type { ReportData } from "@/lib/types";
+import type { ReportData } from '@/lib/types';
 
 /**
  * Build the report PDF in the browser.
@@ -10,18 +10,18 @@ import type { ReportData } from "@/lib/types";
  * which matters here — the live preview calls this on every pause in typing.
  */
 export async function renderReportPdf(data: ReportData): Promise<Blob> {
-  const [{ pdf }, { ReportDocument }] = await Promise.all([
-    import("@react-pdf/renderer"),
-    import("@/components/pdf/ReportDocument"),
-  ]);
-  return pdf(<ReportDocument data={data} />).toBlob();
+	const [{ pdf }, { ReportDocument }] = await Promise.all([
+		import('@react-pdf/renderer'),
+		import('@/components/pdf/ReportDocument')
+	]);
+	return pdf(<ReportDocument data={data} />).toBlob();
 }
 
 /** `my-store-report.pdf`, from whatever the store is called. */
 export function reportFileName(storeName: string): string {
-  const slug = storeName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return `${slug || "store"}-report.pdf`;
+	const slug = storeName
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '');
+	return `${slug || 'store'}-report.pdf`;
 }
